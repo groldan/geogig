@@ -24,6 +24,7 @@ import org.locationtech.geogig.api.Platform;
 import org.locationtech.geogig.api.RevTree;
 import org.locationtech.geogig.api.plumbing.ResolveGeogigDir;
 import org.locationtech.geogig.api.plumbing.merge.Conflict;
+import org.locationtech.geogig.repository.RepositoryConnectionException;
 import org.locationtech.geogig.storage.AbstractStagingDatabase;
 import org.locationtech.geogig.storage.ConfigDatabase;
 import org.locationtech.geogig.storage.ObjectDatabase;
@@ -74,13 +75,27 @@ abstract class JEStagingDatabase extends AbstractStagingDatabase {
 
     private File repositoryDirectory;
 
+    private final String formatVersion;
+
     public JEStagingDatabase(final ObjectDatabase repositoryDb,
             final Supplier<JEObjectDatabase> stagingDbSupplier, final Platform platform,
-            final ConfigDatabase configDB) {
+            final ConfigDatabase configDB, final String formatVersion) {
         super(Suppliers.ofInstance(repositoryDb), stagingDbSupplier);
 
         this.platform = platform;
         this.configDB = configDB;
+        this.formatVersion = formatVersion;
+    }
+
+    @Override
+    public void configure() throws RepositoryConnectionException {
+        RepositoryConnectionException.StorageType.STAGING.configure(configDB, "bdbje",
+                formatVersion);
+    }
+
+    @Override
+    public void checkConfig() throws RepositoryConnectionException {
+        RepositoryConnectionException.StorageType.STAGING.verify(configDB, "bdbje", formatVersion);
     }
 
     @Override

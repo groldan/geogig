@@ -24,10 +24,13 @@ import org.locationtech.geogig.storage.RefDatabase;
 import org.locationtech.geogig.storage.StagingDatabase;
 import org.locationtech.geogig.storage.bdbje.JEGraphDatabase_v0_1;
 import org.locationtech.geogig.storage.bdbje.JEGraphDatabase_v0_2;
+import org.locationtech.geogig.storage.bdbje.JEGraphDatabase_v0_3;
 import org.locationtech.geogig.storage.bdbje.JEObjectDatabase_v0_1;
 import org.locationtech.geogig.storage.bdbje.JEObjectDatabase_v0_2;
+import org.locationtech.geogig.storage.bdbje.JEObjectDatabase_v0_3;
 import org.locationtech.geogig.storage.bdbje.JEStagingDatabase_v0_1;
 import org.locationtech.geogig.storage.bdbje.JEStagingDatabase_v0_2;
+import org.locationtech.geogig.storage.bdbje.JEStagingDatabase_v0_3;
 import org.locationtech.geogig.storage.fs.FileRefDatabase;
 import org.locationtech.geogig.storage.mongo.MongoGraphDatabase;
 import org.locationtech.geogig.storage.mongo.MongoObjectDatabase;
@@ -47,11 +50,11 @@ public class CLIContextBuilder extends ContextBuilder {
 
     private static final VersionedFormat DEFAULT_REFS = new VersionedFormat("file", "1.0");
 
-    private static final VersionedFormat DEFAULT_OBJECTS = new VersionedFormat("bdbje", "0.2");
+    private static final VersionedFormat DEFAULT_OBJECTS = new VersionedFormat("bdbje", "0.3");
 
-    private static final VersionedFormat DEFAULT_STAGING = new VersionedFormat("bdbje", "0.2");
+    private static final VersionedFormat DEFAULT_STAGING = new VersionedFormat("bdbje", "0.3");
 
-    private static final VersionedFormat DEFAULT_GRAPH = new VersionedFormat("bdbje", "0.2");
+    private static final VersionedFormat DEFAULT_GRAPH = new VersionedFormat("bdbje", "0.3");
 
     private static final PluginDefaults defaults = new PluginDefaults(DEFAULT_OBJECTS,//
             DEFAULT_STAGING,//
@@ -79,6 +82,10 @@ public class CLIContextBuilder extends ContextBuilder {
             MapBinder<VersionedFormat, ObjectDatabase> objectPlugins = MapBinder.newMapBinder(
                     binder(), VersionedFormat.class, ObjectDatabase.class);
             objectPlugins //
+                    .addBinding(new VersionedFormat("bdbje", "0.3"))//
+                    .to(JEObjectDatabase_v0_3.class)//
+                    .in(Scopes.SINGLETON);//
+            objectPlugins //
                     .addBinding(new VersionedFormat("bdbje", "0.2"))//
                     .to(JEObjectDatabase_v0_2.class)//
                     .in(Scopes.SINGLETON);//
@@ -102,6 +109,10 @@ public class CLIContextBuilder extends ContextBuilder {
                     .to(MongoStagingDatabase.class)//
                     .in(Scopes.SINGLETON);
             stagingPlugins //
+                    .addBinding(new VersionedFormat("bdbje", "0.3"))//
+                    .to(JEStagingDatabase_v0_3.class)//
+                    .in(Scopes.SINGLETON);
+            stagingPlugins //
                     .addBinding(new VersionedFormat("bdbje", "0.2"))//
                     .to(JEStagingDatabase_v0_2.class)//
                     .in(Scopes.SINGLETON);
@@ -116,6 +127,10 @@ public class CLIContextBuilder extends ContextBuilder {
                     .in(Scopes.SINGLETON);
             MapBinder<VersionedFormat, GraphDatabase> graphPlugins = MapBinder.newMapBinder(
                     binder(), VersionedFormat.class, GraphDatabase.class);
+            graphPlugins //
+                    .addBinding(new VersionedFormat("bdbje", "0.3")) //
+                    .to(JEGraphDatabase_v0_3.class) //
+                    .in(Scopes.SINGLETON);
             graphPlugins //
                     .addBinding(new VersionedFormat("bdbje", "0.2")) //
                     .to(JEGraphDatabase_v0_2.class) //

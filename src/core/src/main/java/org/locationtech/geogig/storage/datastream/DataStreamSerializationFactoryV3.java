@@ -1,25 +1,15 @@
-/* Copyright (c) 2014 Boundless and others.
+/*******************************************************************************
+ * Copyright (c) 2014 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * https://www.eclipse.org/org/documents/edl-v10.html
- *
- * Contributors:
- * Gabriel Roldan (Boundless) - initial implementation
- */
+ *******************************************************************************/
 package org.locationtech.geogig.storage.datastream;
 
-import static org.locationtech.geogig.storage.datastream.FormatCommonV2.readCommit;
-import static org.locationtech.geogig.storage.datastream.FormatCommonV2.readFeature;
-import static org.locationtech.geogig.storage.datastream.FormatCommonV2.readFeatureType;
 import static org.locationtech.geogig.storage.datastream.FormatCommonV2.readHeader;
-import static org.locationtech.geogig.storage.datastream.FormatCommonV2.readTag;
-import static org.locationtech.geogig.storage.datastream.FormatCommonV2.readTree;
-import static org.locationtech.geogig.storage.datastream.FormatCommonV2.writeCommit;
-import static org.locationtech.geogig.storage.datastream.FormatCommonV2.writeFeature;
-import static org.locationtech.geogig.storage.datastream.FormatCommonV2.writeFeatureType;
-import static org.locationtech.geogig.storage.datastream.FormatCommonV2.writeTag;
-import static org.locationtech.geogig.storage.datastream.FormatCommonV2.writeTree;
+import static org.locationtech.geogig.storage.datastream.Varint.readUnsignedVarInt;
+import static org.locationtech.geogig.storage.datastream.Varint.writeUnsignedVarInt;
 
 import java.io.DataInput;
 import java.io.DataInputStream;
@@ -33,34 +23,32 @@ import java.util.Map;
 import org.locationtech.geogig.api.ObjectId;
 import org.locationtech.geogig.api.RevCommit;
 import org.locationtech.geogig.api.RevFeature;
+import org.locationtech.geogig.api.RevFeatureImpl;
 import org.locationtech.geogig.api.RevFeatureType;
 import org.locationtech.geogig.api.RevObject;
 import org.locationtech.geogig.api.RevObject.TYPE;
-import org.locationtech.geogig.api.RevTag;
 import org.locationtech.geogig.api.RevTree;
+import org.locationtech.geogig.storage.FieldType;
 import org.locationtech.geogig.storage.ObjectReader;
 import org.locationtech.geogig.storage.ObjectSerializingFactory;
 import org.locationtech.geogig.storage.ObjectWriter;
 
-import com.google.common.collect.Maps;
+import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
 
 /**
  * Serialization factory for serial version 2
  */
-public class DataStreamSerializationFactoryV2 implements ObjectSerializingFactory {
+public class DataStreamSerializationFactoryV3 implements ObjectSerializingFactory {
 
-    public static final DataStreamSerializationFactoryV2 INSTANCE = new DataStreamSerializationFactoryV2();
+    public static final DataStreamSerializationFactoryV3 INSTANCE = new DataStreamSerializationFactoryV3();
 
-    private final static ObjectReader<RevObject> OBJECT_READER = new ObjectReaderV2();
+    private final static ObjectReader<RevObject> OBJECT_READER = new ObjectReaderV3();
 
-    static final EnumMap<TYPE, Serializer<? extends RevObject>> serializers = Maps
-            .newEnumMap(TYPE.class);
+    private static final EnumMap<TYPE, Serializer<? extends RevObject>> serializers = new EnumMap<>(
+            DataStreamSerializationFactoryV2.serializers);
     static {
-        serializers.put(TYPE.COMMIT, new CommitSerializer());
         serializers.put(TYPE.FEATURE, new FeatureSerializer());
-        serializers.put(TYPE.FEATURETYPE, new FeatureTypeSerializer());
-        serializers.put(TYPE.TAG, new TagSerializer());
-        serializers.put(TYPE.TREE, new TreeSerializer());
     }
 
     @SuppressWarnings("unchecked")
@@ -112,23 +100,6 @@ public class DataStreamSerializationFactoryV2 implements ObjectSerializingFactor
         return OBJECT_READER;
     }
 
-    private static final class CommitSerializer extends Serializer<RevCommit> {
-
-        CommitSerializer() {
-            super(TYPE.COMMIT);
-        }
-
-        @Override
-        public RevCommit readBody(ObjectId id, DataInput in) throws IOException {
-            return readCommit(id, in);
-        }
-
-        @Override
-        public void writeBody(RevCommit commit, DataOutput data) throws IOException {
-            writeCommit(commit, data);
-        }
-    }
-
     private static final class FeatureSerializer extends Serializer<RevFeature> {
 
         FeatureSerializer() {
@@ -146,58 +117,35 @@ public class DataStreamSerializationFactoryV2 implements ObjectSerializingFactor
         }
     }
 
-    private static final class FeatureTypeSerializer extends Serializer<RevFeatureType> {
+    public static void writeFeature(RevFeature feature, DataOutput data) throws IOException {
+        ImmutableList<Optional<Object>> values = feature.getValues();
 
-        FeatureTypeSerializer() {
-            super(TYPE.FEATURETYPE);
-        }
+        writeUnsignedVarInt(values.size(), data);
 
-        @Override
-        public RevFeatureType readBody(ObjectId id, DataInput in) throws IOException {
-            return readFeatureType(id, in);
-        }
-
-        @Override
-        public void writeBody(RevFeatureType object, DataOutput data) throws IOException {
-            writeFeatureType(object, data);
+        for (Optional<Object> field : values) {
+            FieldType type = FieldType.forValue(field);
+            data.writeByte(type.getTag());
+            if (type != FieldType.NULL) {
+                DataStreamValueSerializerV3.write(field, data);
+            }
         }
     }
 
-    private static final class TagSerializer extends Serializer<RevTag> {
+    public static RevFeature readFeature(ObjectId id, DataInput in) throws IOException {
+        final int count = readUnsignedVarInt(in);
+        final ImmutableList.Builder<Optional<Object>> builder = ImmutableList.builder();
 
-        TagSerializer() {
-            super(TYPE.TAG);
+        for (int i = 0; i < count; i++) {
+            final byte fieldTag = in.readByte();
+            final FieldType fieldType = FieldType.valueOf(fieldTag);
+            Object value = DataStreamValueSerializerV3.read(fieldType, in);
+            builder.add(Optional.fromNullable(value));
         }
 
-        @Override
-        public RevTag readBody(ObjectId id, DataInput in) throws IOException {
-            return readTag(id, in);
-        }
-
-        @Override
-        public void writeBody(RevTag tag, DataOutput data) throws IOException {
-            writeTag(tag, data);
-        }
+        return new RevFeatureImpl(id, builder.build());
     }
 
-    private static final class TreeSerializer extends Serializer<RevTree> {
-
-        TreeSerializer() {
-            super(TYPE.TREE);
-        }
-
-        @Override
-        public RevTree readBody(ObjectId id, DataInput in) throws IOException {
-            return readTree(id, in);
-        }
-
-        @Override
-        public void writeBody(RevTree tree, DataOutput data) throws IOException {
-            writeTree(tree, data);
-        }
-    }
-
-    static final class ObjectReaderV2 implements ObjectReader<RevObject> {
+    private static final class ObjectReaderV3 implements ObjectReader<RevObject> {
         @Override
         public RevObject read(ObjectId id, InputStream rawData) throws IllegalArgumentException {
             DataInput in = new DataInputStream(rawData);
@@ -210,7 +158,7 @@ public class DataStreamSerializationFactoryV2 implements ObjectSerializingFactor
 
         private RevObject readData(ObjectId id, DataInput in) throws IOException {
             final TYPE type = readHeader(in);
-            Serializer<RevObject> serializer = DataStreamSerializationFactoryV2.serializer(type);
+            Serializer<RevObject> serializer = DataStreamSerializationFactoryV3.serializer(type);
             RevObject object = serializer.readBody(id, in);
             return object;
         }

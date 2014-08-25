@@ -38,6 +38,7 @@ import javax.annotation.Nullable;
 
 import org.locationtech.geogig.api.ObjectId;
 import org.locationtech.geogig.api.RevObject;
+import org.locationtech.geogig.repository.RepositoryConnectionException;
 import org.locationtech.geogig.storage.AbstractObjectDatabase;
 import org.locationtech.geogig.storage.BulkOpListener;
 import org.locationtech.geogig.storage.ConfigDatabase;
@@ -117,14 +118,28 @@ abstract class JEObjectDatabase extends AbstractObjectDatabase implements Object
 
     private final String envName;
 
+    private final String formatVersion;
+
     public JEObjectDatabase(final ObjectSerializingFactory serialization,
             final ConfigDatabase configDB, final EnvironmentBuilder envProvider,
-            final boolean readOnly, final String envName) {
+            final boolean readOnly, final String envName, final String formatVersion) {
         super(serialization);
         this.configDB = configDB;
         this.envProvider = envProvider;
         this.readOnly = readOnly;
         this.envName = envName;
+        this.formatVersion = formatVersion;
+    }
+
+    @Override
+    public void configure() throws RepositoryConnectionException {
+        RepositoryConnectionException.StorageType.OBJECT
+                .configure(configDB, "bdbje", formatVersion);
+    }
+
+    @Override
+    public void checkConfig() throws RepositoryConnectionException {
+        RepositoryConnectionException.StorageType.OBJECT.verify(configDB, "bdbje", formatVersion);
     }
 
     /**
