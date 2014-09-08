@@ -46,7 +46,11 @@ class GeometryEncoder {
 
     private static final int TYPE_GEOMETRYCOLLECTION = 0x07;
 
-    private static final int MASK_EMPTY_GEOMETRY = 0b0001000;
+    private static final int MASK_GEOMETRY_TYPE = 0b00000111;
+
+    private static final int MASK_EMPTY_GEOMETRY = 0b00001000;
+
+    private static final int MASK_DECIMAL_PLACES = 0b11110000;
 
     private static final Map<String, Integer> GEOMETRY_TYPES = ImmutableMap
             .<String, Integer> builder().put("Point", Integer.valueOf(TYPE_POINT))//
@@ -83,7 +87,11 @@ class GeometryEncoder {
     protected final void write(Geometry geom, DataOutput out, double scale) throws IOException {
         final int geometryType = getGeometryType(geom);
         final int emptyMask = geom.isEmpty() ? MASK_EMPTY_GEOMETRY : 0x0;
-        final int typeAndMasks = geometryType | emptyMask;
+        int decimalPlaces = (int) Math.log10(scale);
+        decimalPlaces <<= 4;
+
+        final int typeAndMasks = geometryType | emptyMask | decimalPlaces;
+
         writeUnsignedVarInt(typeAndMasks, out);
 
         if (emptyMask != MASK_EMPTY_GEOMETRY) {
@@ -93,20 +101,25 @@ class GeometryEncoder {
     }
 
     public Geometry read(DataInput in, GeometryFactory factory) throws IOException {
+
         final int typeAndMasks = readUnsignedVarInt(in);
-        final int type = typeAndMasks & 0b00000111;
-        final boolean empty = (typeAndMasks & 0b0001000) == MASK_EMPTY_GEOMETRY;
+        final int type = typeAndMasks & MASK_GEOMETRY_TYPE;
+        final boolean empty = (typeAndMasks & MASK_EMPTY_GEOMETRY) == MASK_EMPTY_GEOMETRY;
+        final int numDecimalPlaces = (typeAndMasks & MASK_DECIMAL_PLACES) >> 4;
+
         GeometryEncoder concreteEncoder = ENCODERS[type];
         Geometry geom;
         if (empty) {
             geom = concreteEncoder.createEmpty(factory);
         } else {
-            geom = concreteEncoder.readBody(in, factory);
+            double scale = Math.pow(10, numDecimalPlaces);
+            geom = concreteEncoder.readBody(in, factory, scale);
         }
         return geom;
     }
 
-    protected Geometry readBody(DataInput in, GeometryFactory factory) throws IOException {
+    protected Geometry readBody(DataInput in, GeometryFactory factory, double scale)
+            throws IOException {
         throw new UnsupportedOperationException("Must be overriden");
     }
 
@@ -208,57 +221,58 @@ class GeometryEncoder {
         }
     }
 
-    /**
-     * Converts the requested coordinate from fixed to double precision.
-     */
-    static double toDoublePrecision(final long fixedPrecisionOrdinate, final GeometryFactory factory) {
-        assert factory.getPrecisionModel().getType() == PrecisionModel.FIXED;
-        double scale = factory.getPrecisionModel().getScale();
-        return toDoublePrecision(fixedPrecisionOrdinate, scale);
-    }
-
     static double toDoublePrecision(final long fixedPrecisionOrdinate, final double scale) {
         double ordinate = fixedPrecisionOrdinate / scale;
         return ordinate;
     }
 
-    static final CoordinateSequence readSequence(DataInput in, GeometryFactory factory)
+    static final CoordinateSequence readSequence(DataInput in, GeometryFactory factory, double scale)
             throws IOException {
         final int size = readUnsignedVarInt(in);
-        return readSequence(in, factory, size);
+        return readSequence(in, factory, size, scale);
     }
 
     static final CoordinateSequence readSequence(DataInput in, GeometryFactory factory,
-            final int size) throws IOException {
-
-        CoordinateSequence seq = newSequence(factory, size);
+            final int size, double scale) throws IOException {
 
         long deltaX;
         long deltaY;
 
         long fixedX = readSignedVarLong(in);
         long fixedY = readSignedVarLong(in);
-        seq.setOrdinate(0, 0, toDoublePrecision(fixedX, factory));
-        seq.setOrdinate(0, 1, toDoublePrecision(fixedY, factory));
+        double x = toDoublePrecision(fixedX, scale);
+        double y = toDoublePrecision(fixedY, scale);
 
-        final PrecisionModel precisionModel = factory.getPrecisionModel();
+        CoordinateSequence seq = factory.getCoordinateSequenceFactory().create(size, 2);
+        seq.setOrdinate(0, 0, x);
+        seq.setOrdinate(0, 1, y);
+
         for (int i = 1; i < size; i++) {
             deltaX = readSignedVarLong(in);
             deltaY = readSignedVarLong(in);
+
             fixedX += deltaX;
             fixedY += deltaY;
-            seq.setOrdinate(i, 0, precisionModel.makePrecise(toDoublePrecision(fixedX, factory)));
-            seq.setOrdinate(i, 1, precisionModel.makePrecise(toDoublePrecision(fixedY, factory)));
+
+            x = toDoublePrecision(fixedX, scale);
+            y = toDoublePrecision(fixedY, scale);
+            if (Double.isInfinite(x) || Double.isInfinite(y) || Double.isNaN(x) || Double.isNaN(y)) {
+                throw new IllegalArgumentException();
+            }
+            seq.setOrdinate(i, 0, x);
+            seq.setOrdinate(i, 1, y);
         }
+
         return seq;
     }
 
-    private static Polygon readPolygon(DataInput in, GeometryFactory factory) throws IOException {
-        LinearRing shell = factory.createLinearRing(readSequence(in, factory));
+    private static Polygon readPolygon(DataInput in, GeometryFactory factory, double scale)
+            throws IOException {
+        LinearRing shell = factory.createLinearRing(readSequence(in, factory, scale));
         final int numHoles = readUnsignedVarInt(in);
         LinearRing[] holes = new LinearRing[numHoles];
         for (int h = 0; h < numHoles; h++) {
-            holes[h] = factory.createLinearRing(readSequence(in, factory));
+            holes[h] = factory.createLinearRing(readSequence(in, factory, scale));
         }
         Polygon polygon = factory.createPolygon(shell, holes);
         return polygon;
@@ -282,8 +296,9 @@ class GeometryEncoder {
         }
 
         @Override
-        protected Geometry readBody(DataInput in, GeometryFactory factory) throws IOException {
-            CoordinateSequence seq = readSequence(in, factory, 1);
+        protected Geometry readBody(DataInput in, GeometryFactory factory, double scale)
+                throws IOException {
+            CoordinateSequence seq = readSequence(in, factory, 1, scale);
             return factory.createPoint(seq);
         }
 
@@ -300,8 +315,9 @@ class GeometryEncoder {
         }
 
         @Override
-        protected Geometry readBody(DataInput in, GeometryFactory factory) throws IOException {
-            CoordinateSequence seq = readSequence(in, factory);
+        protected Geometry readBody(DataInput in, GeometryFactory factory, double scale)
+                throws IOException {
+            CoordinateSequence seq = readSequence(in, factory, scale);
             return factory.createLineString(seq);
         }
 
@@ -318,8 +334,9 @@ class GeometryEncoder {
         }
 
         @Override
-        protected Geometry readBody(DataInput in, GeometryFactory factory) throws IOException {
-            return readPolygon(in, factory);
+        protected Geometry readBody(DataInput in, GeometryFactory factory, double scale)
+                throws IOException {
+            return readPolygon(in, factory, scale);
         }
 
         @Override
@@ -337,8 +354,9 @@ class GeometryEncoder {
         }
 
         @Override
-        protected Geometry readBody(DataInput in, GeometryFactory factory) throws IOException {
-            CoordinateSequence seq = readSequence(in, factory);
+        protected Geometry readBody(DataInput in, GeometryFactory factory, double scale)
+                throws IOException {
+            CoordinateSequence seq = readSequence(in, factory, scale);
             return factory.createMultiPoint(seq);
         }
 
@@ -367,12 +385,13 @@ class GeometryEncoder {
         }
 
         @Override
-        protected Geometry readBody(DataInput in, GeometryFactory factory) throws IOException {
+        protected Geometry readBody(DataInput in, GeometryFactory factory, double scale)
+                throws IOException {
             final int nlines = readUnsignedVarInt(in);
             LineString[] lines = new LineString[nlines];
             CoordinateSequence seq;
             for (int i = 0; i < nlines; i++) {
-                seq = readSequence(in, factory);
+                seq = readSequence(in, factory, scale);
                 lines[i] = factory.createLineString(seq);
             }
             return factory.createMultiLineString(lines);
@@ -398,11 +417,12 @@ class GeometryEncoder {
         }
 
         @Override
-        protected Geometry readBody(DataInput in, GeometryFactory factory) throws IOException {
+        protected Geometry readBody(DataInput in, GeometryFactory factory, double scale)
+                throws IOException {
             final int npolys = readUnsignedVarInt(in);
             Polygon[] polys = new Polygon[npolys];
             for (int i = 0; i < npolys; i++) {
-                polys[i] = readPolygon(in, factory);
+                polys[i] = readPolygon(in, factory, scale);
             }
             return factory.createMultiPolygon(polys);
         }
@@ -426,7 +446,8 @@ class GeometryEncoder {
         }
 
         @Override
-        protected Geometry readBody(DataInput in, GeometryFactory factory) throws IOException {
+        protected Geometry readBody(DataInput in, GeometryFactory factory, double scale)
+                throws IOException {
             final int ngeoms = readUnsignedVarInt(in);
             Geometry[] geoms = new Geometry[ngeoms];
             for (int i = 0; i < ngeoms; i++) {

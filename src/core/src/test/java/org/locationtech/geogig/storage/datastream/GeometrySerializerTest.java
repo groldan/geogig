@@ -134,6 +134,10 @@ public class GeometrySerializerTest {
         testGeom("POLYGON ((1.0 1.1, 2.0 2.1, 3.0 3.1, 1.0 1.1))");
         testGeom("POLYGON ((-10 -10, -10 10, 10 10, 10 -10, -10 -10),(-1 -1, -1 1, 1 1, 1 -1, -1 -1))");
         testGeom("POLYGON ((-10 -10, -10 10, 10 10, 10 -10, -10 -10),(-1 -1, -1 1, 1 1, 1 -1, -1 -1),(3 3, 3 4, 4 4, 4 4, 3 3))");
+    }
+
+    @Test
+    public void testBigPolygon() throws IOException {
         testGeom(BIG_UTM_POLYGON);
     }
 

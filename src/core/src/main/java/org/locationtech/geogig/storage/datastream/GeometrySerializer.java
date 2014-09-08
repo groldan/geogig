@@ -13,6 +13,8 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
+import org.locationtech.geogig.repository.Hints;
+
 import com.google.common.base.Preconditions;
 import com.vividsolutions.jts.geom.CoordinateSequenceFactory;
 import com.vividsolutions.jts.geom.Geometry;
@@ -23,22 +25,28 @@ import com.vividsolutions.jts.geom.impl.PackedCoordinateSequenceFactory;
 /**
  * Serialization format for JTS geometries more compact than WKB for fixed precision models.
  */
-class GeometrySerializer implements ValueSerializer {
+class GeometrySerializer extends ValueSerializer {
 
     private static final double DEFAULT_FIXED_PRECISION_FACTOR = 1e9;
 
     private static final CoordinateSequenceFactory DEFAULT_COORDINATE_SEQUENCE_FACTORY = new PackedCoordinateSequenceFactory();
 
-    private static final PrecisionModel DEFAULT_PRECISION_MODEL = new PrecisionModel(
-            DEFAULT_FIXED_PRECISION_FACTOR);
-
-    private static final GeometryFactory DEFAULT_GEOMETRY_FACTORY = new GeometryFactory(
-            DEFAULT_PRECISION_MODEL, 0, DEFAULT_COORDINATE_SEQUENCE_FACTORY);
-
     private static final GeometryEncoder GEOMETRY_ENCODER = GeometryEncoder.INSTANCE;
 
-    private static final GeometrySerializer DEFAULT_PRECISION = new GeometrySerializer(
-            DEFAULT_GEOMETRY_FACTORY);
+    private static final GeometrySerializer[] BY_DECIMAL_PLACES = {//
+    createWithDecimalPlaces(0),//
+            createWithDecimalPlaces(1),//
+            createWithDecimalPlaces(2),//
+            createWithDecimalPlaces(3),//
+            createWithDecimalPlaces(4),//
+            createWithDecimalPlaces(5),//
+            createWithDecimalPlaces(6),//
+            createWithDecimalPlaces(7),//
+            createWithDecimalPlaces(8),//
+            createWithDecimalPlaces(9) //
+    };
+
+    private static final GeometrySerializer DEFAULT_PRECISION = BY_DECIMAL_PLACES[9];
 
     private GeometryFactory factory;
 
@@ -51,7 +59,11 @@ class GeometrySerializer implements ValueSerializer {
     }
 
     public static GeometrySerializer withDecimalPlaces(int numDecimals) {
-        Preconditions.checkArgument(numDecimals > 0 && numDecimals < 10);
+        return createWithDecimalPlaces(numDecimals);
+    }
+
+    private static GeometrySerializer createWithDecimalPlaces(int numDecimals) {
+        Preconditions.checkArgument(numDecimals >= 0 && numDecimals < 10);
         double scale = Math.pow(10, numDecimals);
         PrecisionModel pm = new PrecisionModel(scale);
         GeometryFactory factory = new GeometryFactory(pm, 0, DEFAULT_COORDINATE_SEQUENCE_FACTORY);
@@ -75,7 +87,13 @@ class GeometrySerializer implements ValueSerializer {
 
     @Override
     public Geometry read(DataInput in) throws IOException {
-        Geometry geom = GEOMETRY_ENCODER.read(in, factory);
+        return read(in, Hints.nil());
+    }
+
+    @Override
+    public Geometry read(DataInput in, Hints hints) throws IOException {
+        GeometryFactory gf = hints.geometryFactory().or(this.factory);
+        Geometry geom = GEOMETRY_ENCODER.read(in, gf);
         return geom;
     }
 
