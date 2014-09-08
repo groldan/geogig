@@ -29,6 +29,7 @@ import org.geotools.factory.Hints;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.filter.Filters;
 import org.geotools.filter.visitor.SimplifyingFilterVisitor;
+import org.geotools.geometry.jts.JTSFactoryFinder;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.renderer.ScreenMap;
 import org.locationtech.geogig.api.Context;
@@ -52,6 +53,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.vividsolutions.jts.geom.GeometryFactory;
 
 /**
  *
@@ -92,6 +94,7 @@ class GeogigFeatureSource extends ContentFeatureSource {
     protected void addHints(Set<Hints.Key> hints) {
         hints.add(Hints.FEATURE_DETACHED);
         hints.add(Hints.SCREENMAP);
+        hints.add(Hints.JTS_GEOMETRY_FACTORY);
     }
 
     @Override
@@ -202,11 +205,10 @@ class GeogigFeatureSource extends ContentFeatureSource {
 
         FeatureReader<SimpleFeatureType, SimpleFeature> features;
         if (isNaturalOrder(query.getSortBy())) {
-            Integer offset = query.getStartIndex();
-            Integer maxFeatures = query.getMaxFeatures() == Integer.MAX_VALUE ? null : query
-                    .getMaxFeatures();
-            ScreenMap screenMap = (ScreenMap) query.getHints().get(Hints.SCREENMAP);
-            features = getNativeReader(Query.NO_NAMES, filter, offset, maxFeatures, screenMap);
+            Query boundsQuery = new Query(query);
+            boundsQuery.setPropertyNames(Query.NO_NAMES);
+            boundsQuery.setFilter(filter);
+            features = getNativeReader(boundsQuery);
         } else {
             features = getReader(query);
         }
@@ -249,8 +251,10 @@ class GeogigFeatureSource extends ContentFeatureSource {
 
         FeatureReader<SimpleFeatureType, SimpleFeature> features;
         if (isNaturalOrder(query.getSortBy())) {
-            ScreenMap screenMap = (ScreenMap) query.getHints().get(Hints.SCREENMAP);
-            features = getNativeReader(Query.NO_NAMES, filter, offset, maxFeatures, screenMap);
+            Query countQuery = new Query(query);
+            countQuery.setPropertyNames(Query.NO_NAMES);
+            countQuery.setFilter(filter);
+            features = getNativeReader(countQuery);
         } else {
             features = getReader(query);
         }
@@ -277,13 +281,13 @@ class GeogigFeatureSource extends ContentFeatureSource {
         final int startIndex = Optional.fromNullable(query.getStartIndex()).or(Integer.valueOf(0));
         final Integer maxFeatures = query.getMaxFeatures() == Integer.MAX_VALUE ? null : query
                 .getMaxFeatures();
-        final Filter filter = query.getFilter();
-        final ScreenMap screenMap = (ScreenMap) query.getHints().get(Hints.SCREENMAP);
-        final String[] propertyNames = query.getPropertyNames();
         if (naturalOrder) {
-            reader = getNativeReader(propertyNames, filter, startIndex, maxFeatures, screenMap);
+            reader = getNativeReader(query);
         } else {
-            reader = getNativeReader(propertyNames, filter, null, null, screenMap);
+            Query q = new Query(query);
+            q.setMaxFeatures(Integer.MAX_VALUE);
+            q.setStartIndex(null);
+            reader = getNativeReader(q);
             // sorting
             reader = new SortedFeatureReader(DataUtilities.simple(reader), query);
             if (startIndex > 0) {
@@ -312,15 +316,19 @@ class GeogigFeatureSource extends ContentFeatureSource {
      * @param propertyNames properties to retrieve, empty array for no properties at all
      *        {@link Query#NO_NAMES}, {@code null} means all properties {@link Query#ALL_NAMES}
      */
-    private FeatureReader<SimpleFeatureType, SimpleFeature> getNativeReader(
-            @Nullable String[] propertyNames, Filter filter, @Nullable Integer offset,
-            @Nullable Integer maxFeatures, @Nullable final ScreenMap screenMap) {
+    private FeatureReader<SimpleFeatureType, SimpleFeature> getNativeReader(final Query query) {
+
+        final Integer offset = query.getStartIndex();
+        final Integer maxFeatures = query.getMaxFeatures() == Integer.MAX_VALUE ? null : query
+                .getMaxFeatures();
+        final ScreenMap screenMap = (ScreenMap) query.getHints().get(Hints.SCREENMAP);
 
         if (screenMap == null) {
             LOGGER.trace("GeoGigFeatureSource.getNativeReader: no screenMap provided");
         } else {
             LOGGER.trace("GeoGigFeatureSource.getNativeReader: using screenMap filter");
         }
+        Filter filter = query.getFilter();
         LOGGER.trace("Query filter: {}", filter);
         filter = (Filter) filter.accept(new SimplifyingFilterVisitor(), null);
         LOGGER.trace("Simplified filter: {}", filter);
@@ -333,6 +341,7 @@ class GeogigFeatureSource extends ContentFeatureSource {
         final SimpleFeatureType fullType = getSchema();
 
         boolean ignoreAttributes = false;
+        final String[] propertyNames = query.getPropertyNames();
         if (propertyNames != null && propertyNames.length == 0) {
             String[] inProcessFilteringAttributes = Filters.attributeNames(filter, fullType);
             ignoreAttributes = inProcessFilteringAttributes.length == 0;
@@ -345,7 +354,17 @@ class GeogigFeatureSource extends ContentFeatureSource {
         nativeReader = new GeogigFeatureReader<SimpleFeatureType, SimpleFeature>(context, fullType,
                 filter, featureTypeTreePath, rootRef, compareRootRef, changeType, offset,
                 maxFeatures, screenMap, ignoreAttributes);
+        GeometryFactory gf = getGeometryFactory(query.getHints());
+        if (gf != null) {
+            nativeReader.setGeometryFactory(gf);
+        }
         return nativeReader;
+    }
+
+    @Nullable
+    private GeometryFactory getGeometryFactory(Hints hints) {
+        GeometryFactory geometryFactory = JTSFactoryFinder.getGeometryFactory(hints);
+        return geometryFactory;
     }
 
     public void setChangeType(GeoGigDataStore.ChangeType changeType) {

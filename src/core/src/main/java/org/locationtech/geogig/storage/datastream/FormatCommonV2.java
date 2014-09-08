@@ -22,6 +22,7 @@ import static org.locationtech.geogig.storage.datastream.Varint.writeUnsignedVar
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,6 +58,7 @@ import org.locationtech.geogig.api.RevTagImpl;
 import org.locationtech.geogig.api.RevTree;
 import org.locationtech.geogig.api.RevTreeImpl;
 import org.locationtech.geogig.api.plumbing.diff.DiffEntry;
+import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.storage.FieldType;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.AttributeDescriptor;
@@ -300,14 +302,14 @@ public class FormatCommonV2 {
         }
     }
 
-    public static RevFeature readFeature(ObjectId id, DataInput in) throws IOException {
+    public static RevFeature readFeature(ObjectId id, DataInput in, Hints hints) throws IOException {
         final int count = readUnsignedVarInt(in);
         final ImmutableList.Builder<Optional<Object>> builder = ImmutableList.builder();
 
         for (int i = 0; i < count; i++) {
             final byte fieldTag = in.readByte();
             final FieldType fieldType = FieldType.valueOf(fieldTag);
-            Object value = DataStreamValueSerializerV2.read(fieldType, in);
+            Object value = DataStreamValueSerializerV2.read(fieldType, in, hints);
             builder.add(Optional.fromNullable(value));
         }
 
@@ -329,6 +331,15 @@ public class FormatCommonV2 {
 
     public final static void requireHeader(DataInput in, RevObject.TYPE header) throws IOException {
         int s = in.readByte() & 0xFF;
+        if (header.value() != s) {
+            throw new IllegalArgumentException(String.format(
+                    "Expected header %s(%d), but actually got %d", header, header.value(), s));
+        }
+    }
+
+    public final static void requireHeader(InputStream in, RevObject.TYPE header)
+            throws IOException {
+        int s = in.read();
         if (header.value() != s) {
             throw new IllegalArgumentException(String.format(
                     "Expected header %s(%d), but actually got %d", header, header.value(), s));

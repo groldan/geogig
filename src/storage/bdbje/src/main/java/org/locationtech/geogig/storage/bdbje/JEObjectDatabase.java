@@ -38,6 +38,7 @@ import javax.annotation.Nullable;
 
 import org.locationtech.geogig.api.ObjectId;
 import org.locationtech.geogig.api.RevObject;
+import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.repository.RepositoryConnectionException;
 import org.locationtech.geogig.storage.AbstractObjectDatabase;
 import org.locationtech.geogig.storage.BulkOpListener;
@@ -733,11 +734,13 @@ abstract class JEObjectDatabase extends AbstractObjectDatabase implements Object
     }
 
     @Override
-    public Iterator<RevObject> getAll(final Iterable<ObjectId> ids, final BulkOpListener listener) {
+    public Iterator<RevObject> getAll(final Iterable<ObjectId> ids, final BulkOpListener listener,
+            Hints hints) {
         Preconditions.checkNotNull(ids, "ids");
         checkOpen();
 
-        return new CursorRevObjectIterator(ids.iterator(), listener);
+        return new CursorRevObjectIterator(ids.iterator(), listener, hints == null ? Hints.nil()
+                : hints);
     }
 
     private class CursorRevObjectIterator extends AbstractIterator<RevObject> implements Closeable {
@@ -755,15 +758,20 @@ abstract class JEObjectDatabase extends AbstractObjectDatabase implements Object
 
         private Iterator<ObjectId> sortedIds;
 
+        private Hints hints;
+
         /**
          * Uses a transaction to open a read only cursor for it to work when called from a different
          * threads than the one it was created at. The transaction is aborted at {@link #close()}
+         * 
+         * @param hints
          */
         public CursorRevObjectIterator(final Iterator<ObjectId> objectIds,
-                final BulkOpListener listener) {
+                final BulkOpListener listener, Hints hints) {
 
             this.unsortedIds = Iterators.partition(objectIds, getBulkPartitionSize());
             this.sortedIds = Iterators.emptyIterator();
+            this.hints = hints;
 
             this.listener = listener;
             CursorConfig cursorConfig = new CursorConfig();
@@ -813,7 +821,7 @@ abstract class JEObjectDatabase extends AbstractObjectDatabase implements Object
                     if (SUCCESS.equals(status)) {
                         InputStream rawData;
                         rawData = new LZFInputStream(new ByteArrayInputStream(data.getData()));
-                        found = reader.read(id, rawData);
+                        found = reader.read(id, rawData, hints);
                         listener.found(found.getId(), data.getSize());
                     } else {
                         listener.notFound(id);

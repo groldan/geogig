@@ -110,6 +110,10 @@ public abstract class RevFeatureSerializationTest extends Assert {
         assertEquals(newFeature.getValues().size(), feat.getValues().size());
 
         for (int i = 0; i < newFeature.getValues().size(); i++) {
+            assertEquals(newFeature.getValue(i), feat.getValue(i));
+        }
+
+        for (int i = 0; i < newFeature.getValues().size(); i++) {
             assertEquals(newFeature.getValues().get(i).orNull(), feat.getValues().get(i).orNull());
         }
 

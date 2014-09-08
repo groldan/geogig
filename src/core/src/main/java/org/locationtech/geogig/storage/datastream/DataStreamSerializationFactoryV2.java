@@ -30,6 +30,8 @@ import java.io.Serializable;
 import java.util.EnumMap;
 import java.util.Map;
 
+import javax.annotation.Nullable;
+
 import org.locationtech.geogig.api.ObjectId;
 import org.locationtech.geogig.api.RevCommit;
 import org.locationtech.geogig.api.RevFeature;
@@ -38,6 +40,7 @@ import org.locationtech.geogig.api.RevObject;
 import org.locationtech.geogig.api.RevObject.TYPE;
 import org.locationtech.geogig.api.RevTag;
 import org.locationtech.geogig.api.RevTree;
+import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.storage.ObjectReader;
 import org.locationtech.geogig.storage.ObjectSerializingFactory;
 import org.locationtech.geogig.storage.ObjectWriter;
@@ -102,8 +105,12 @@ public class DataStreamSerializationFactoryV2 implements ObjectSerializingFactor
         return serializer(type);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public <T extends RevObject> ObjectReader<T> createObjectReader(TYPE type) {
+    public <T extends RevObject> ObjectReader<T> createObjectReader(@Nullable TYPE type) {
+        if (type == null) {
+            return (ObjectReader<T>) OBJECT_READER;
+        }
         return serializer(type);
     }
 
@@ -136,8 +143,8 @@ public class DataStreamSerializationFactoryV2 implements ObjectSerializingFactor
         }
 
         @Override
-        public RevFeature readBody(ObjectId id, DataInput in) throws IOException {
-            return readFeature(id, in);
+        public RevFeature readBody(ObjectId id, DataInput in, Hints hints) throws IOException {
+            return readFeature(id, in, hints);
         }
 
         @Override
@@ -197,21 +204,27 @@ public class DataStreamSerializationFactoryV2 implements ObjectSerializingFactor
         }
     }
 
-    static final class ObjectReaderV2 implements ObjectReader<RevObject> {
+    private static final class ObjectReaderV2 implements ObjectReader<RevObject> {
         @Override
         public RevObject read(ObjectId id, InputStream rawData) throws IllegalArgumentException {
+            return read(id, rawData, Hints.nil());
+        }
+
+        @Override
+        public RevObject read(ObjectId id, InputStream rawData, Hints hints)
+                throws IllegalArgumentException {
             DataInput in = new DataInputStream(rawData);
             try {
-                return readData(id, in);
+                return readData(id, in, hints);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
 
-        private RevObject readData(ObjectId id, DataInput in) throws IOException {
+        private RevObject readData(ObjectId id, DataInput in, Hints hints) throws IOException {
             final TYPE type = readHeader(in);
             Serializer<RevObject> serializer = DataStreamSerializationFactoryV2.serializer(type);
-            RevObject object = serializer.readBody(id, in);
+            RevObject object = serializer.readBody(id, in, hints);
             return object;
         }
     }

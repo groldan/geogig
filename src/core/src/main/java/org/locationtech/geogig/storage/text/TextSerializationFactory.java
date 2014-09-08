@@ -45,6 +45,7 @@ import org.locationtech.geogig.api.RevTag;
 import org.locationtech.geogig.api.RevTagImpl;
 import org.locationtech.geogig.api.RevTree;
 import org.locationtech.geogig.api.RevTreeImpl;
+import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.storage.FieldType;
 import org.locationtech.geogig.storage.ObjectReader;
 import org.locationtech.geogig.storage.ObjectSerializingFactory;
@@ -530,6 +531,11 @@ public class TextSerializationFactory implements ObjectSerializingFactory {
 
     private abstract static class TextReader<T extends RevObject> implements ObjectReader<T> {
 
+        @Override
+        public T read(ObjectId id, InputStream rawData, Hints hints) throws IllegalArgumentException {
+            return read(id, rawData);
+        }
+        
         @Override
         public T read(ObjectId id, InputStream rawData) throws IllegalArgumentException {
             try {

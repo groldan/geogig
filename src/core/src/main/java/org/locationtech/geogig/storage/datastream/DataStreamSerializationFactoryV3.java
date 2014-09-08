@@ -11,30 +11,40 @@ import static org.locationtech.geogig.storage.datastream.FormatCommonV2.readHead
 import static org.locationtech.geogig.storage.datastream.Varint.readUnsignedVarInt;
 import static org.locationtech.geogig.storage.datastream.Varint.writeUnsignedVarInt;
 
+import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
+
+import javax.annotation.Nullable;
 
 import org.locationtech.geogig.api.ObjectId;
 import org.locationtech.geogig.api.RevCommit;
 import org.locationtech.geogig.api.RevFeature;
-import org.locationtech.geogig.api.RevFeatureImpl;
 import org.locationtech.geogig.api.RevFeatureType;
 import org.locationtech.geogig.api.RevObject;
 import org.locationtech.geogig.api.RevObject.TYPE;
 import org.locationtech.geogig.api.RevTree;
+import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.storage.FieldType;
 import org.locationtech.geogig.storage.ObjectReader;
 import org.locationtech.geogig.storage.ObjectSerializingFactory;
 import org.locationtech.geogig.storage.ObjectWriter;
 
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.google.common.io.ByteStreams;
 
 /**
  * Serialization factory for serial version 2
@@ -90,8 +100,12 @@ public class DataStreamSerializationFactoryV3 implements ObjectSerializingFactor
         return serializer(type);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public <T extends RevObject> ObjectReader<T> createObjectReader(TYPE type) {
+    public <T extends RevObject> ObjectReader<T> createObjectReader(@Nullable TYPE type) {
+        if (type == null) {
+            return (ObjectReader<T>) OBJECT_READER;
+        }
         return serializer(type);
     }
 
@@ -107,8 +121,8 @@ public class DataStreamSerializationFactoryV3 implements ObjectSerializingFactor
         }
 
         @Override
-        public RevFeature readBody(ObjectId id, DataInput in) throws IOException {
-            return readFeature(id, in);
+        public RevFeature readBody(ObjectId id, DataInput in, Hints hints) throws IOException {
+            return readFeature(id, in, hints);
         }
 
         @Override
@@ -120,46 +134,104 @@ public class DataStreamSerializationFactoryV3 implements ObjectSerializingFactor
     public static void writeFeature(RevFeature feature, DataOutput data) throws IOException {
         ImmutableList<Optional<Object>> values = feature.getValues();
 
-        writeUnsignedVarInt(values.size(), data);
+        final int attCount = values.size();
 
-        for (Optional<Object> field : values) {
-            FieldType type = FieldType.forValue(field);
-            data.writeByte(type.getTag());
-            if (type != FieldType.NULL) {
-                DataStreamValueSerializerV3.write(field, data);
+        ByteArrayOutputStream header = new ByteArrayOutputStream(attCount + 10);
+        ByteArrayOutputStream dataBuff = new ByteArrayOutputStream();
+        {
+            DataOutputStream headerOut = new DataOutputStream(header);
+            DataOutputStream dataOut = new DataOutputStream(dataBuff);
+
+            writeUnsignedVarInt(attCount, headerOut);
+
+            for (int i = 0; i < attCount; i++) {
+                Optional<Object> field = values.get(i);
+                FieldType type = FieldType.forValue(field);
+                int offset = dataOut.size();
+                dataOut.writeByte(type.getTag());
+                if (type != FieldType.NULL) {
+                    DataStreamValueSerializerV3.write(field, dataOut);
+                }
+
+                writeUnsignedVarInt(offset, headerOut);
             }
+            headerOut.flush();
+            dataOut.flush();
+        }
+
+        data.write(header.toByteArray());
+        data.write(dataBuff.toByteArray());
+    }
+
+    public static RevFeature readFeature(ObjectId id, DataInput in, Hints hints) throws IOException {
+        try {
+            final int count = readUnsignedVarInt(in);
+            List<Integer> offsets = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                offsets.add(Integer.valueOf(readUnsignedVarInt(in)));
+            }
+
+            final byte[] dataArray = ByteStreams.toByteArray((InputStream) in);
+            final AttributeReader reader = new AttributeReader(dataArray, hints);
+
+            List<Optional<Object>> lazyList = Lists.transform(offsets, reader);
+
+            return new LazyRevFeature(id, lazyList);
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw e;
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            throw e;
         }
     }
 
-    public static RevFeature readFeature(ObjectId id, DataInput in) throws IOException {
-        final int count = readUnsignedVarInt(in);
-        final ImmutableList.Builder<Optional<Object>> builder = ImmutableList.builder();
+    private static class AttributeReader implements Function<Integer, Optional<Object>> {
+        private final byte[] buff;
 
-        for (int i = 0; i < count; i++) {
-            final byte fieldTag = in.readByte();
-            final FieldType fieldType = FieldType.valueOf(fieldTag);
-            Object value = DataStreamValueSerializerV3.read(fieldType, in);
-            builder.add(Optional.fromNullable(value));
+        private Hints hints;
+
+        public AttributeReader(byte[] data, Hints hints) {
+            this.buff = data;
+            this.hints = hints;
         }
 
-        return new RevFeatureImpl(id, builder.build());
-    }
+        @Override
+        public Optional<Object> apply(Integer offset) {
+            Object object;
+            try {
+                DataInput in = ByteStreams.newDataInput(buff, offset.intValue());
+                final byte fieldTag = in.readByte();
+                final FieldType fieldType = FieldType.valueOf(fieldTag);
+                object = DataStreamValueSerializerV3.read(fieldType, in, hints);
+            } catch (IOException e) {
+                throw Throwables.propagate(e);
+            }
+            return Optional.fromNullable(object);
+        }
+    };
 
     private static final class ObjectReaderV3 implements ObjectReader<RevObject> {
+
         @Override
         public RevObject read(ObjectId id, InputStream rawData) throws IllegalArgumentException {
+            return read(id, rawData, Hints.nil());
+        }
+
+        @Override
+        public RevObject read(ObjectId id, InputStream rawData, Hints hints) {
             DataInput in = new DataInputStream(rawData);
             try {
-                return readData(id, in);
+                return readData(id, in, hints);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
         }
 
-        private RevObject readData(ObjectId id, DataInput in) throws IOException {
+        private RevObject readData(ObjectId id, DataInput in, Hints hints) throws IOException {
             final TYPE type = readHeader(in);
             Serializer<RevObject> serializer = DataStreamSerializationFactoryV3.serializer(type);
-            RevObject object = serializer.readBody(id, in);
+            RevObject object = serializer.readBody(id, in, hints);
             return object;
         }
     }

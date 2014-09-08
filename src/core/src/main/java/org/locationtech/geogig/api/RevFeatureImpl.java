@@ -78,4 +78,14 @@ public class RevFeatureImpl extends AbstractRevObject implements RevFeature {
         builder.append(']');
         return builder.toString();
     }
+
+    @Override
+    public int valueCount() {
+        return values.size();
+    }
+
+    @Override
+    public Optional<Object> getValue(int index) {
+        return values.get(index);
+    }
 }

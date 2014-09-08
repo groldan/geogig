@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.util.EnumMap;
 import java.util.Map;
 
+import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.storage.FieldType;
 
 import com.google.common.base.Optional;
@@ -53,8 +54,12 @@ class DataStreamValueSerializerV3 {
      * Reads an object of the specified type from the provided data stream
      */
     public static Object read(FieldType type, DataInput in) throws IOException {
+        return read(type, in, Hints.nil());
+    }
+
+    public static Object read(FieldType type, DataInput in, Hints hints) throws IOException {
         if (serializers.containsKey(type)) {
-            return serializers.get(type).read(in);
+            return serializers.get(type).read(in, hints);
         }
         throw new IllegalArgumentException("The specified type is not supported");
     }

@@ -36,6 +36,8 @@ import java.io.Serializable;
 import java.util.EnumMap;
 import java.util.Map;
 
+import javax.annotation.Nullable;
+
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.CRS.AxisOrder;
 import org.geotools.referencing.wkt.Formattable;
@@ -49,6 +51,7 @@ import org.locationtech.geogig.api.RevObject;
 import org.locationtech.geogig.api.RevObject.TYPE;
 import org.locationtech.geogig.api.RevTag;
 import org.locationtech.geogig.api.RevTree;
+import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.storage.FieldType;
 import org.locationtech.geogig.storage.ObjectReader;
 import org.locationtech.geogig.storage.ObjectSerializingFactory;
@@ -75,7 +78,7 @@ public class DataStreamSerializationFactoryV1 implements ObjectSerializingFactor
      */
     public static final DataStreamSerializationFactoryV1 INSTANCE = new DataStreamSerializationFactoryV1();
 
-    private final static ObjectReader<RevObject> OBJECT_READER = new ObjectReaderV1();
+    private final static ObjectReaderV1 OBJECT_READER = new ObjectReaderV1();
 
     private static final EnumMap<TYPE, Serializer<? extends RevObject>> serializers = Maps
             .newEnumMap(TYPE.class);
@@ -88,7 +91,10 @@ public class DataStreamSerializationFactoryV1 implements ObjectSerializingFactor
     }
 
     @SuppressWarnings("unchecked")
-    private static <T extends RevObject> Serializer<T> serializer(TYPE type) {
+    private static <T extends RevObject> Serializer<T> serializer(@Nullable TYPE type) {
+        if(type == null){
+            return (Serializer<T>) OBJECT_READER;
+        }
         Serializer<? extends RevObject> serializer = serializers.get(type);
         if (serializer == null) {
             throw new UnsupportedOperationException("No serializer for " + type);
@@ -126,8 +132,12 @@ public class DataStreamSerializationFactoryV1 implements ObjectSerializingFactor
         return serializer(type);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public <T extends RevObject> ObjectReader<T> createObjectReader(TYPE type) {
+    public <T extends RevObject> ObjectReader<T> createObjectReader(@Nullable TYPE type) {
+        if (type == null) {
+            return (ObjectReader<T>) OBJECT_READER;
+        }
         return serializer(type);
     }
 
@@ -136,12 +146,16 @@ public class DataStreamSerializationFactoryV1 implements ObjectSerializingFactor
         return OBJECT_READER;
     }
 
-    private static interface Serializer<T extends RevObject> extends ObjectReader<T>,
+    private static abstract class Serializer<T extends RevObject> implements ObjectReader<T>,
             ObjectWriter<T> {
-        //
+        @Override
+        public T read(ObjectId id, InputStream rawData, Hints hints)
+                throws IllegalArgumentException {
+            return read(id, rawData);
+        }
     }
 
-    private static class CommitSerializer implements Serializer<RevCommit> {
+    private static class CommitSerializer extends Serializer<RevCommit> {
         @Override
         public RevCommit read(ObjectId id, InputStream rawData) throws IllegalArgumentException {
             DataInput in = new DataInputStream(rawData);
@@ -174,7 +188,7 @@ public class DataStreamSerializationFactoryV1 implements ObjectSerializingFactor
         }
     }
 
-    private static class FeatureSerializer implements Serializer<RevFeature> {
+    private static class FeatureSerializer extends Serializer<RevFeature> {
 
         @Override
         public RevFeature read(ObjectId id, InputStream rawData) throws IllegalArgumentException {
@@ -204,7 +218,7 @@ public class DataStreamSerializationFactoryV1 implements ObjectSerializingFactor
         }
     }
 
-    private static class FeatureTypeSerializer implements Serializer<RevFeatureType> {
+    private static class FeatureTypeSerializer extends Serializer<RevFeatureType> {
 
         @Override
         public RevFeatureType read(ObjectId id, InputStream rawData)
@@ -290,7 +304,7 @@ public class DataStreamSerializationFactoryV1 implements ObjectSerializingFactor
         }
     }
 
-    private static class TagSerializer implements Serializer<RevTag> {
+    private static class TagSerializer extends Serializer<RevTag> {
         public RevTag read(ObjectId id, InputStream in) {
             DataInput data = new DataInputStream(in);
             try {
@@ -312,7 +326,7 @@ public class DataStreamSerializationFactoryV1 implements ObjectSerializingFactor
         }
     }
 
-    private static class TreeSerializer implements Serializer<RevTree> {
+    private static class TreeSerializer extends Serializer<RevTree> {
 
         @Override
         public RevTree read(ObjectId id, InputStream rawData) throws IllegalArgumentException {
@@ -367,7 +381,7 @@ public class DataStreamSerializationFactoryV1 implements ObjectSerializingFactor
         }
     }
 
-    private static class ObjectReaderV1 implements org.locationtech.geogig.storage.ObjectReader<RevObject> {
+    private static class ObjectReaderV1 extends Serializer<RevObject> {
         @Override
         public RevObject read(ObjectId id, InputStream rawData) throws IllegalArgumentException {
             DataInput in = new DataInputStream(rawData);
@@ -392,6 +406,17 @@ public class DataStreamSerializationFactoryV1 implements ObjectSerializingFactor
                 return readTag(id, in);
             else
                 throw new IllegalArgumentException("Unrecognized object header: " + header);
+        }
+
+        @Override
+        public RevObject read(ObjectId id, InputStream rawData, Hints hints)
+                throws IllegalArgumentException {
+            return read(id, rawData);
+        }
+
+        @Override
+        public void write(RevObject object, OutputStream out) throws IOException {
+            throw new UnsupportedOperationException();
         }
     }
 }

@@ -70,7 +70,7 @@ public class GeogigSimpleFeature implements SimpleFeature {
     /**
      * The actual values held by this feature
      */
-    private Supplier<? extends List<Optional<Object>>> revFeatureValues;
+    private Supplier<RevFeature> revFeature;
 
     // WARN! not to be accessed but by #getValues()
     private List<Optional<Object>> resolvedValues;
@@ -101,24 +101,23 @@ public class GeogigSimpleFeature implements SimpleFeature {
      * constructor
      * </p>
      * 
-     * @param values
+     * @param revFeature
      * @param featureType
      * @param id
      * @param validating
      * @param nameToRevTypeInded - attribute name to value index mapping
      */
-    public GeogigSimpleFeature(ImmutableList<Optional<Object>> values,
-            SimpleFeatureType featureType, FeatureId id, Map<String, Integer> nameToRevTypeInded) {
+    public GeogigSimpleFeature(RevFeature revFeature, SimpleFeatureType featureType, FeatureId id,
+            Map<String, Integer> nameToRevTypeInded) {
 
-        this(Suppliers.ofInstance(values), featureType, id, nameToRevTypeInded, null);
+        this(Suppliers.ofInstance(revFeature), featureType, id, nameToRevTypeInded, null);
     }
 
-    public GeogigSimpleFeature(Supplier<? extends List<Optional<Object>>> values,
-            SimpleFeatureType featureType, FeatureId id, Map<String, Integer> nameToRevTypeInded,
-            @Nullable Node node) {
+    public GeogigSimpleFeature(Supplier<RevFeature> revFeature, SimpleFeatureType featureType,
+            FeatureId id, Map<String, Integer> nameToRevTypeInded, @Nullable Node node) {
         this.id = id;
         this.featureType = featureType;
-        this.revFeatureValues = values;
+        this.revFeature = revFeature;
         this.nameToRevTypeIndex = nameToRevTypeInded;
         this.node = node;
         Integer defaultGeomIndex = nameToRevTypeInded.get(null);
@@ -135,17 +134,15 @@ public class GeogigSimpleFeature implements SimpleFeature {
     private List<Optional<Object>> mutableValues() {
         List<Optional<Object>> values = getValues();
         if (values instanceof ImmutableList) {
-            values = new ArrayList<>(getValues());
-            resolvedValues = null;
-            revFeatureValues = Suppliers.ofInstance(values);
-            return getValues();
+            values = new ArrayList<>(values);
+            resolvedValues = values;
         }
         return values;
     }
 
     private List<Optional<Object>> getValues() {
         if (resolvedValues == null) {
-            resolvedValues = revFeatureValues.get();
+            resolvedValues = revFeature.get().getValues();
         }
         return resolvedValues;
     }
@@ -170,8 +167,10 @@ public class GeogigSimpleFeature implements SimpleFeature {
                 return null;
             }
             return DEFAULT_GEOM_FACTORY.createPoint(new Coordinate(e.getMinX(), e.getMinY()));
+        } else if (resolvedValues == null) {
+            return revFeature.get().getValue(index).orNull();
         }
-        return getValues().get(index).orNull();
+        return resolvedValues.get(index).orNull();
     }
 
     @Override
@@ -207,18 +206,7 @@ public class GeogigSimpleFeature implements SimpleFeature {
     public Object getDefaultGeometry() {
         // should be specified in the index as the default key (null)
         Integer idx = nameToRevTypeIndex.get(null);
-        List<Optional<Object>> values = getValues();
-        Object defaultGeometry = idx != null ? values.get(idx).orNull() : null;
-
-        // not found? do we have a default geometry at all?
-        if (defaultGeometry == null) {
-            GeometryDescriptor geometryDescriptor = featureType.getGeometryDescriptor();
-            if (geometryDescriptor != null) {
-                Integer defaultGeomIndex = nameToRevTypeIndex.get(geometryDescriptor.getName()
-                        .getLocalPart());
-                defaultGeometry = values.get(defaultGeomIndex.intValue()).get();
-            }
-        }
+        Object defaultGeometry = idx != null ? getAttribute(idx.intValue()) : null;
 
         return defaultGeometry;
     }
@@ -548,7 +536,7 @@ public class GeogigSimpleFeature implements SimpleFeature {
 
         @Override
         public Object getValue() {
-            return getValues().get(index).orNull();
+            return getAttribute(index);
         }
 
         @Override

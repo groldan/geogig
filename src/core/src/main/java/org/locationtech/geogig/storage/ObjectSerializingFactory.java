@@ -12,6 +12,8 @@ package org.locationtech.geogig.storage;
 import java.io.Serializable;
 import java.util.Map;
 
+import javax.annotation.Nullable;
+
 import org.locationtech.geogig.api.RevCommit;
 import org.locationtech.geogig.api.RevFeature;
 import org.locationtech.geogig.api.RevFeatureType;
@@ -65,9 +67,9 @@ public interface ObjectSerializingFactory {
 
     /**
      * @param type
-     * @return
+     * @return a reader for the specific type, or a general object reader if {@code type == null}
      */
-    public <T extends RevObject> ObjectReader<T> createObjectReader(TYPE type);
+    public <T extends RevObject> ObjectReader<T> createObjectReader(@Nullable TYPE type);
 
     public ObjectReader<RevObject> createObjectReader();
 }

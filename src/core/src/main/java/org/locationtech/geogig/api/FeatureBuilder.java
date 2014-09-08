@@ -9,7 +9,6 @@
  */
 package org.locationtech.geogig.api;
 
-import java.util.List;
 import java.util.Map;
 
 import org.geotools.filter.identity.FeatureIdVersionedImpl;
@@ -23,7 +22,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
-import com.google.common.collect.ImmutableList;
 
 /**
  * Provides a method of building features from {@link RevFeature} objects that have the type
@@ -79,16 +77,14 @@ public class FeatureBuilder {
 
         final FeatureId fid = new LazyVersionedFeatureId(id, revFeature.getId());
 
-        ImmutableList<Optional<Object>> values = revFeature.getValues();
-        GeogigSimpleFeature feature = new GeogigSimpleFeature(values,
+        GeogigSimpleFeature feature = new GeogigSimpleFeature(revFeature,
                 (SimpleFeatureType) featureType, fid, attNameToRevTypeIndex);
         return feature;
     }
 
     public Feature buildLazy(final String id, final Node node, final RevObjectParse parser) {
 
-        Supplier<? extends List<Optional<Object>>> valueSupplier = new LazyFeatureLoader(
-                node.getObjectId(), parser);
+        Supplier<RevFeature> valueSupplier = new LazyFeatureLoader(node.getObjectId(), parser);
 
         valueSupplier = Suppliers.memoize(valueSupplier);
 
@@ -100,7 +96,7 @@ public class FeatureBuilder {
         return feature;
     }
 
-    private static class LazyFeatureLoader implements Supplier<List<Optional<Object>>> {
+    private static class LazyFeatureLoader implements Supplier<RevFeature> {
 
         private ObjectId objectId;
 
@@ -112,9 +108,9 @@ public class FeatureBuilder {
         }
 
         @Override
-        public List<Optional<Object>> get() {
+        public RevFeature get() {
             Optional<RevFeature> revFeature = parser.setObjectId(objectId).call(RevFeature.class);
-            return revFeature.get().getValues();
+            return revFeature.get();
         }
     }
 

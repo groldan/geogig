@@ -26,6 +26,7 @@ import org.locationtech.geogig.api.RevObject;
 import org.locationtech.geogig.api.RevObject.TYPE;
 import org.locationtech.geogig.api.RevTag;
 import org.locationtech.geogig.api.RevTree;
+import org.locationtech.geogig.repository.Hints;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -90,7 +91,7 @@ public abstract class AbstractObjectDatabase implements ObjectDatabase {
         Preconditions.checkNotNull(id, "id");
 
         final ObjectReader<RevObject> reader = serializationFactory.createObjectReader();
-        return get(id, reader, true);
+        return get(id, reader, true, Hints.nil());
     }
 
     @Override
@@ -98,7 +99,11 @@ public abstract class AbstractObjectDatabase implements ObjectDatabase {
         Preconditions.checkNotNull(id, "id");
 
         final ObjectReader<RevObject> reader = serializationFactory.createObjectReader();
-        return get(id, reader, false);
+        return get(id, reader, false, Hints.nil());
+    }
+
+    public <T extends RevObject> T get(final ObjectId id, final Class<T> clazz) {
+        return get(id, clazz, Hints.nil());
     }
 
     /**
@@ -111,35 +116,35 @@ public abstract class AbstractObjectDatabase implements ObjectDatabase {
      *      org.locationtech.geogig.storage.ObjectReader)
      */
     @Override
-    public <T extends RevObject> T get(final ObjectId id, final Class<T> clazz) {
+    public <T extends RevObject> T get(final ObjectId id, final Class<T> clazz, Hints hints) {
         Preconditions.checkNotNull(id, "id");
         Preconditions.checkNotNull(clazz, "class");
 
         final ObjectReader<T> reader = serializationFactory.createObjectReader(getType(clazz));
 
-        return get(id, reader, true);
+        return get(id, reader, true, hints);
     }
 
     @Override
-    public @Nullable <T extends RevObject> T getIfPresent(ObjectId id, Class<T> clazz)
+    public @Nullable RevObject getIfPresent(ObjectId id, Hints hints)
             throws IllegalArgumentException {
         Preconditions.checkNotNull(id, "id");
-        Preconditions.checkNotNull(clazz, "class");
+        Preconditions.checkNotNull(hints, "hints");
 
-        final ObjectReader<T> reader = serializationFactory.createObjectReader(getType(clazz));
+        final ObjectReader<RevObject> reader = serializationFactory.createObjectReader();
 
-        return get(id, reader, false);
+        return get(id, reader, false, hints);
     }
 
     private <T extends RevObject> T get(final ObjectId id, final ObjectReader<T> reader,
-            boolean failIfNotFound) {
+            boolean failIfNotFound, Hints hints) {
         InputStream raw = getRaw(id, failIfNotFound);
         if (null == raw) {
             return null;
         }
         T object;
         try {
-            object = reader.read(id, raw);
+            object = reader.read(id, raw, hints);
         } finally {
             Closeables.closeQuietly(raw);
         }
@@ -175,6 +180,9 @@ public abstract class AbstractObjectDatabase implements ObjectDatabase {
     }
 
     private RevObject.TYPE getType(Class<? extends RevObject> clazz) {
+        if (RevObject.class.equals(clazz)) {
+            return null;
+        }
         return TYPE.valueOf(clazz);
     }
 
@@ -270,7 +278,7 @@ public abstract class AbstractObjectDatabase implements ObjectDatabase {
 
     @Override
     public Iterator<RevObject> getAll(final Iterable<ObjectId> ids) {
-        return getAll(ids, BulkOpListener.NOOP_LISTENER);
+        return getAll(ids, BulkOpListener.NOOP_LISTENER, Hints.nil());
     }
 
     @Override

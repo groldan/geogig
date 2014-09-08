@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentMap;
 
 import org.locationtech.geogig.api.ObjectId;
 import org.locationtech.geogig.api.RevObject;
+import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.storage.AbstractObjectDatabase;
 import org.locationtech.geogig.storage.BulkOpListener;
 import org.locationtech.geogig.storage.ObjectDatabase;
@@ -161,7 +162,8 @@ public class HeapObjectDatabse extends AbstractObjectDatabase implements ObjectD
     }
 
     @Override
-    public Iterator<RevObject> getAll(final Iterable<ObjectId> ids, final BulkOpListener listener) {
+    public Iterator<RevObject> getAll(final Iterable<ObjectId> ids, final BulkOpListener listener,
+            Hints hints) {
 
         return new AbstractIterator<RevObject>() {
             final Iterator<ObjectId> iterator = ids.iterator();

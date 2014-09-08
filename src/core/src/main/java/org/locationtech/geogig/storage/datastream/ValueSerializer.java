@@ -4,10 +4,17 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-interface ValueSerializer {
+import org.locationtech.geogig.repository.Hints;
 
-    public Object read(DataInput in) throws IOException;
+abstract class ValueSerializer {
+    public Object read(DataInput in, Hints hints) throws IOException {
+        return read(in);
+    }
 
-    public void write(Object obj, DataOutput out) throws IOException;
+    public Object read(DataInput in) throws IOException {
+        throw new UnsupportedOperationException("Must override");
+    }
+
+    public abstract void write(Object obj, DataOutput out) throws IOException;
 
 }

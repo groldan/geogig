@@ -25,10 +25,12 @@ import java.util.Date;
 import java.util.EnumMap;
 import java.util.Map;
 
+import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.storage.FieldType;
 
 import com.google.common.base.Optional;
 import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.GeometryFactory;
 import com.vividsolutions.jts.io.ParseException;
 import com.vividsolutions.jts.io.WKBReader;
 import com.vividsolutions.jts.io.WKBWriter;
@@ -38,7 +40,6 @@ import com.vividsolutions.jts.io.WKBWriter;
  * 
  */
 class DataStreamValueSerializerV2 {
-
     static final Map<FieldType, ValueSerializer> serializers = new EnumMap<>(FieldType.class);
     static {
         serializers.put(FieldType.NULL, new ValueSerializer() {
@@ -316,9 +317,15 @@ class DataStreamValueSerializerV2 {
         });
         ValueSerializer geometry = new ValueSerializer() {
             @Override
-            public Object read(DataInput in) throws IOException {
+            public Object read(DataInput in, Hints hints) throws IOException {
                 byte[] bytes = (byte[]) byteArray.read(in);
-                WKBReader wkbReader = new WKBReader();
+                WKBReader wkbReader;
+                GeometryFactory gf = hints.geometryFactory().orNull();
+                if (gf == null) {
+                    wkbReader = new WKBReader();
+                } else {
+                    wkbReader = new WKBReader(gf);
+                }
                 try {
                     return wkbReader.read(bytes);
                 } catch (ParseException e) {
@@ -469,8 +476,12 @@ class DataStreamValueSerializerV2 {
      * @return
      */
     public static Object read(FieldType type, DataInput in) throws IOException {
+        return read(type, in, Hints.nil());
+    }
+
+    public static Object read(FieldType type, DataInput in, Hints hints) throws IOException {
         if (serializers.containsKey(type)) {
-            return serializers.get(type).read(in);
+            return serializers.get(type).read(in, hints);
         } else {
             throw new IllegalArgumentException("The specified type is not supported");
         }

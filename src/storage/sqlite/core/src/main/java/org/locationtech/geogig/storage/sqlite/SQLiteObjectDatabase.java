@@ -31,6 +31,7 @@ import org.locationtech.geogig.api.RevFeatureType;
 import org.locationtech.geogig.api.RevObject;
 import org.locationtech.geogig.api.RevTag;
 import org.locationtech.geogig.api.RevTree;
+import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.repository.RepositoryConnectionException;
 import org.locationtech.geogig.storage.BulkOpListener;
 import org.locationtech.geogig.storage.ConfigDatabase;
@@ -119,25 +120,29 @@ public abstract class SQLiteObjectDatabase<C> implements ObjectDatabase {
 
     @Override
     public <T extends RevObject> T get(ObjectId id, Class<T> type) throws IllegalArgumentException {
-        T obj = getIfPresent(id, type);
+        return get(id, type, Hints.nil());
+    }
+
+    @Override
+    public <T extends RevObject> T get(ObjectId id, Class<T> type, Hints hints)
+            throws IllegalArgumentException {
+        RevObject obj = getIfPresent(id, hints);
         if (obj == null) {
-            throw new NoSuchElementException("No object with ids: " + id);
+            throw new NoSuchElementException("No object with id: " + id);
         }
 
-        return obj;
+        return type.cast(obj);
     }
 
     @Override
     public RevObject getIfPresent(ObjectId id) {
-        InputStream bytes = get(id.toString(), cx);
-        return readObject(bytes, id);
+        return getIfPresent(id, Hints.nil());
     }
 
     @Override
-    public <T extends RevObject> T getIfPresent(ObjectId id, Class<T> type)
-            throws IllegalArgumentException {
-        RevObject obj = getIfPresent(id);
-        return obj != null ? type.cast(obj) : null;
+    public RevObject getIfPresent(ObjectId id, Hints hints) throws IllegalArgumentException {
+        InputStream bytes = get(id.toString(), cx);
+        return readObject(bytes, id, hints);
     }
 
     @Override
@@ -167,11 +172,12 @@ public abstract class SQLiteObjectDatabase<C> implements ObjectDatabase {
 
     @Override
     public Iterator<RevObject> getAll(Iterable<ObjectId> ids) {
-        return getAll(ids, BulkOpListener.NOOP_LISTENER);
+        return getAll(ids, BulkOpListener.NOOP_LISTENER, Hints.nil());
     }
 
     @Override
-    public Iterator<RevObject> getAll(Iterable<ObjectId> ids, final BulkOpListener listener) {
+    public Iterator<RevObject> getAll(Iterable<ObjectId> ids, final BulkOpListener listener,
+            Hints hints) {
         return filter(transform(ids, new Function<ObjectId, RevObject>() {
             @Override
             public RevObject apply(ObjectId id) {
@@ -243,12 +249,12 @@ public abstract class SQLiteObjectDatabase<C> implements ObjectDatabase {
     /**
      * Reads object from its binary representation as stored in the database.
      */
-    protected RevObject readObject(InputStream bytes, ObjectId id) {
+    protected RevObject readObject(InputStream bytes, ObjectId id, Hints hints) {
         if (bytes == null) {
             return null;
         }
 
-        return serializer.createObjectReader().read(id, bytes);
+        return serializer.createObjectReader().read(id, bytes, hints);
     }
 
     /**

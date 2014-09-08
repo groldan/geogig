@@ -46,6 +46,8 @@ import org.locationtech.geogig.api.plumbing.FindTreeChild;
 import org.locationtech.geogig.api.plumbing.ResolveTreeish;
 import org.locationtech.geogig.api.plumbing.diff.DiffEntry;
 import org.locationtech.geogig.geotools.data.GeoGigDataStore.ChangeType;
+import org.locationtech.geogig.repository.Hints;
+import org.locationtech.geogig.storage.BulkOpListener;
 import org.locationtech.geogig.storage.ObjectDatabase;
 import org.opengis.feature.Feature;
 import org.opengis.feature.simple.SimpleFeature;
@@ -70,6 +72,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
 import com.vividsolutions.jts.geom.Envelope;
+import com.vividsolutions.jts.geom.GeometryFactory;
 
 /**
  *
@@ -81,20 +84,29 @@ class GeogigFeatureReader<T extends FeatureType, F extends Feature> implements F
 
     private static final FilterFactory2 filterFactory = CommonFactoryFinder.getFilterFactory2();
 
-    private SimpleFeatureType schema;
+    private final SimpleFeatureType schema;
 
     private Iterator<SimpleFeature> features;
 
     @Nullable
-    private Integer offset;
+    private final Integer offset;
 
     @Nullable
-    private Integer maxFeatures;
+    private final Integer maxFeatures;
 
     @Nullable
     private final ScreenMapFilter screenMapFilter;
 
-    private Context context;
+    @Nullable
+    private GeometryFactory geometryFactory;
+
+    private final DiffTree diffOp;
+
+    private final ChangeType changeType;
+
+    private final Filter filter;
+
+    private final Context context;
 
     /**
      * @param context
@@ -113,7 +125,6 @@ class GeogigFeatureReader<T extends FeatureType, F extends Feature> implements F
             String oldHeadRef, ChangeType changeType, @Nullable Integer offset,
             @Nullable Integer maxFeatures, @Nullable final ScreenMap screenMap,
             final boolean ignoreAttributes) {
-        this.context = context;
         checkNotNull(context);
         checkNotNull(schema);
         checkNotNull(origFilter);
@@ -121,6 +132,7 @@ class GeogigFeatureReader<T extends FeatureType, F extends Feature> implements F
         checkNotNull(headRef);
         checkNotNull(oldHeadRef);
         checkNotNull(changeType);
+        this.context = context;
         this.schema = schema;
         this.offset = offset;
         this.maxFeatures = maxFeatures;
@@ -142,9 +154,9 @@ class GeogigFeatureReader<T extends FeatureType, F extends Feature> implements F
                 .setParent(rootTree).setChildPath(typeTreePath).call();
         checkArgument(typeTreeRef.isPresent(), "Feature type tree not found: %s", typeTreeRefSpec);
 
-        final Filter filter = reprojectFilter(origFilter);
+        this.filter = reprojectFilter(origFilter);
 
-        DiffTree diffOp = context.command(DiffTree.class);
+        this.diffOp = context.command(DiffTree.class);
         diffOp.setOldVersion(effectiveOldHead);
         diffOp.setNewVersion(effectiveHead);
 
@@ -164,36 +176,8 @@ class GeogigFeatureReader<T extends FeatureType, F extends Feature> implements F
         if (!queryBounds.isEmpty()) {
             diffOp.setBoundsFilter(queryBounds);
         }
+        this.changeType = changeType;
         diffOp.setChangeTypeFilter(changeType(changeType));
-
-        Iterator<DiffEntry> diffs = diffOp.call();
-
-        Iterator<NodeRef> featureRefs = toFeatureRefs(diffs, changeType);
-
-        final boolean filterSupportedByRefs = Filter.INCLUDE.equals(filter)
-                || filter instanceof BBOX || filter instanceof Id;
-
-        if (filterSupportedByRefs) {
-            featureRefs = applyRefsOffsetLimit(featureRefs);
-        }
-
-        // NodeRefToFeature refToFeature = new NodeRefToFeature(context, schema);
-
-        final Function<List<NodeRef>, Iterator<SimpleFeature>> function;
-        function = new FetchFunction(context.stagingDatabase(), schema);
-        final int fetchSize = 1000;
-        Iterator<List<NodeRef>> partition = Iterators.partition(featureRefs, fetchSize);
-        Iterator<Iterator<SimpleFeature>> transformed = Iterators.transform(partition, function);
-
-        // final Iterator<SimpleFeature> featuresUnfiltered = transform(featureRefs, refToFeature);
-        final Iterator<SimpleFeature> featuresUnfiltered = Iterators.concat(transformed);
-
-        FilterPredicate filterPredicate = new FilterPredicate(filter);
-        Iterator<SimpleFeature> featuresFiltered = filter(featuresUnfiltered, filterPredicate);
-        if (!filterSupportedByRefs) {
-            featuresFiltered = applyFeaturesOffsetLimit(featuresFiltered);
-        }
-        this.features = featuresFiltered;
     }
 
     private DiffEntry.ChangeType changeType(ChangeType changeType) {
@@ -265,13 +249,50 @@ class GeogigFeatureReader<T extends FeatureType, F extends Feature> implements F
 
     @Override
     public boolean hasNext() {
+        if (this.features == null) {
+            init();
+        }
         boolean hasNext = features.hasNext();
         return hasNext;
+    }
+
+    private void init() {
+        Iterator<DiffEntry> diffs = diffOp.call();
+
+        Iterator<NodeRef> featureRefs = toFeatureRefs(diffs, changeType);
+
+        final boolean filterSupportedByRefs = Filter.INCLUDE.equals(filter)
+                || filter instanceof BBOX || filter instanceof Id;
+
+        if (filterSupportedByRefs) {
+            featureRefs = applyRefsOffsetLimit(featureRefs);
+        }
+
+        Hints hints = new Hints();
+        if (geometryFactory != null) {
+            hints = Hints.geometryFactory(geometryFactory);
+        }
+
+        final Function<List<NodeRef>, Iterator<SimpleFeature>> function;
+        function = new FetchFunction(context.stagingDatabase(), schema, hints);
+        final int fetchSize = 1000;
+        Iterator<List<NodeRef>> partition = Iterators.partition(featureRefs, fetchSize);
+        Iterator<Iterator<SimpleFeature>> transformed = Iterators.transform(partition, function);
+
+        final Iterator<SimpleFeature> featuresUnfiltered = Iterators.concat(transformed);
+
+        FilterPredicate filterPredicate = new FilterPredicate(filter);
+        Iterator<SimpleFeature> featuresFiltered = filter(featuresUnfiltered, filterPredicate);
+        if (!filterSupportedByRefs) {
+            featuresFiltered = applyFeaturesOffsetLimit(featuresFiltered);
+        }
+        this.features = featuresFiltered;
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public F next() {
+        Preconditions.checkState(hasNext());
         return (F) features.next();
     }
 
@@ -330,10 +351,13 @@ class GeogigFeatureReader<T extends FeatureType, F extends Feature> implements F
 
         private final FeatureBuilder featureBuilder;
 
+        private Hints hints;
+
         // RevObjectParse parser = context.command(RevObjectParse.class);
-        public FetchFunction(ObjectDatabase source, SimpleFeatureType schema) {
+        public FetchFunction(ObjectDatabase source, SimpleFeatureType schema, Hints hints) {
             this.featureBuilder = new FeatureBuilder(schema);
             this.source = source;
+            this.hints = hints;
         }
 
         @Override
@@ -355,7 +379,7 @@ class GeogigFeatureReader<T extends FeatureType, F extends Feature> implements F
                 fidIndex.put(ref.objectId(), ref.name());
             }
             Iterable<ObjectId> ids = fidIndex.keySet();
-            Iterator<RevObject> all = source.getAll(ids);
+            Iterator<RevObject> all = source.getAll(ids, BulkOpListener.NOOP_LISTENER, hints);
 
             AsFeature asFeature = new AsFeature(featureBuilder, fidIndex);
             Iterator<SimpleFeature> features = Iterators.transform(all, asFeature);
@@ -538,5 +562,9 @@ class GeogigFeatureReader<T extends FeatureType, F extends Feature> implements F
             return !skip;
         }
 
+    }
+
+    public void setGeometryFactory(GeometryFactory geometryFactory) {
+        this.geometryFactory = geometryFactory;
     }
 }

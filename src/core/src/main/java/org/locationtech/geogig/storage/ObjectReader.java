@@ -13,8 +13,7 @@ import java.io.InputStream;
 
 import org.locationtech.geogig.api.ObjectId;
 import org.locationtech.geogig.api.RevObject;
-
-import com.vividsolutions.jts.geom.GeometryFactory;
+import org.locationtech.geogig.repository.Hints;
 
 /**
  * Provides a base interface for reading GeoGig objects from an {@link InputStream}.
@@ -22,16 +21,6 @@ import com.vividsolutions.jts.geom.GeometryFactory;
  * @param <T> the type of the object to read
  */
 public interface ObjectReader<T extends RevObject> {
-
-    /**
-     * Hint of type {@link GeometryFactory}
-     */
-    public static final String JTS_GEOMETRY_FACTORY = "JTS_GEOMETRY_FACTORY";
-
-    /**
-     * Hint of type Boolean
-     */
-    public static final String USE_PROVIDED_FID = "USE_PROVIDED_FID";
 
     /**
      * Reads an object from the given input stream and assigns it the provided {@link ObjectId id}.
@@ -44,4 +33,5 @@ public interface ObjectReader<T extends RevObject> {
      */
     public T read(ObjectId id, InputStream rawData) throws IllegalArgumentException;
 
+    public T read(ObjectId id, InputStream rawData, Hints hints) throws IllegalArgumentException;
 }

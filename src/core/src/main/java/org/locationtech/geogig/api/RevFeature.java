@@ -18,5 +18,9 @@ public interface RevFeature extends RevObject {
      * @return a list of values, with {@link Optional#absent()} representing a null value
      */
     public ImmutableList<Optional<Object>> getValues();
+    
+    public int valueCount();
+    
+    public Optional<Object> getValue(int index);
 
 }

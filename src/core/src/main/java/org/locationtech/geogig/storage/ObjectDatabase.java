@@ -23,6 +23,7 @@ import org.locationtech.geogig.api.RevObject;
 import org.locationtech.geogig.api.RevTag;
 import org.locationtech.geogig.api.RevTree;
 import org.locationtech.geogig.di.Singleton;
+import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.repository.RepositoryConnectionException;
 
 /**
@@ -88,23 +89,22 @@ public interface ObjectDatabase extends Closeable {
      */
     public <T extends RevObject> T get(ObjectId id, Class<T> type) throws IllegalArgumentException;
 
-    /**
-     * Reads an object with the given {@link ObjectId id} out of the database.
-     * 
-     * @return the object found, or {@code null} if no object is found
-     */
-    public @Nullable
-    RevObject getIfPresent(ObjectId id);
+    public <T extends RevObject> T get(ObjectId id, Class<T> type, Hints hints)
+            throws IllegalArgumentException;
 
     /**
      * Reads an object with the given {@link ObjectId id} out of the database.
      * 
      * @return the object found, or {@code null} if no object is found
-     * @throws IllegalArgumentException if the object is found but is not of the required
-     *         {@code type}
      */
-    public @Nullable
-    <T extends RevObject> T getIfPresent(ObjectId id, Class<T> type)
+    public @Nullable RevObject getIfPresent(ObjectId id);
+
+    /**
+     * Reads an object with the given {@link ObjectId id} out of the database.
+     * 
+     * @return the object found, or {@code null} if no object is found
+     */
+    public @Nullable RevObject getIfPresent(ObjectId id, Hints hints)
             throws IllegalArgumentException;
 
     /**
@@ -178,7 +178,7 @@ public interface ObjectDatabase extends Closeable {
      *        deleted} and {@link BulkOpListener#notFound(ObjectId) not found} items
      * @return an iterator with the objects <b>found</b> on the database, in no particular order
      */
-    public Iterator<RevObject> getAll(final Iterable<ObjectId> ids, BulkOpListener listener);
+    public Iterator<RevObject> getAll(final Iterable<ObjectId> ids, BulkOpListener listener, Hints hints);
 
     /**
      * Shorthand for {@link #putAll(Iterator, BulkOpListener)} with

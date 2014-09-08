@@ -15,6 +15,7 @@ import java.util.List;
 
 import org.locationtech.geogig.api.ObjectId;
 import org.locationtech.geogig.api.RevObject;
+import org.locationtech.geogig.repository.Hints;
 
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.Iterators;
@@ -24,7 +25,7 @@ public class StagingDbCompositionHelper {
 
     public static Iterator<RevObject> getAll(final ObjectDatabase objectDb,
             final ObjectDatabase stagingDb, final Iterable<ObjectId> ids,
-            final BulkOpListener listener) {
+            final BulkOpListener listener, final Hints hints) {
 
         final List<ObjectId> missingInStaging = Lists.newLinkedList();
 
@@ -37,7 +38,7 @@ public class StagingDbCompositionHelper {
             }
         };
 
-        final Iterator<RevObject> foundInStaging = stagingDb.getAll(ids, stagingListener);
+        final Iterator<RevObject> foundInStaging = stagingDb.getAll(ids, stagingListener, hints);
 
         Iterator<RevObject> compositeIterator = new AbstractIterator<RevObject>() {
 
@@ -52,7 +53,7 @@ public class StagingDbCompositionHelper {
                     List<ObjectId> missing = new ArrayList<ObjectId>(missingInStaging);
                     missingInStaging.clear();
 
-                    forwardedToObjectDb = objectDb.getAll(missing, listener);
+                    forwardedToObjectDb = objectDb.getAll(missing, listener, hints);
                     return computeNext();
                 }
                 if (foundInStaging.hasNext()) {
@@ -62,7 +63,7 @@ public class StagingDbCompositionHelper {
                 } else if (!missingInStaging.isEmpty()) {
                     List<ObjectId> missing = new ArrayList<ObjectId>(missingInStaging);
                     missingInStaging.clear();
-                    forwardedToObjectDb = objectDb.getAll(missing, listener);
+                    forwardedToObjectDb = objectDb.getAll(missing, listener, hints);
                     return computeNext();
                 }
                 return endOfData();

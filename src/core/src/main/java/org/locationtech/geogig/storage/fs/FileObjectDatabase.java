@@ -28,6 +28,7 @@ import org.locationtech.geogig.api.ObjectId;
 import org.locationtech.geogig.api.Platform;
 import org.locationtech.geogig.api.RevObject;
 import org.locationtech.geogig.api.plumbing.ResolveGeogigDir;
+import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.repository.RepositoryConnectionException;
 import org.locationtech.geogig.storage.AbstractObjectDatabase;
 import org.locationtech.geogig.storage.BulkOpListener;
@@ -162,7 +163,8 @@ public class FileObjectDatabase extends AbstractObjectDatabase implements Object
     }
 
     /**
-     * @see org.locationtech.geogig.storage.AbstractObjectDatabase#putInternal(org.locationtech.geogig.api.ObjectId, byte[])
+     * @see org.locationtech.geogig.storage.AbstractObjectDatabase#putInternal(org.locationtech.geogig.api.ObjectId,
+     *      byte[])
      */
     @Override
     protected boolean putInternal(final ObjectId id, final byte[] rawData) {
@@ -258,7 +260,7 @@ public class FileObjectDatabase extends AbstractObjectDatabase implements Object
     }
 
     @Override
-    public Iterator<RevObject> getAll(Iterable<ObjectId> ids, BulkOpListener listener) {
+    public Iterator<RevObject> getAll(Iterable<ObjectId> ids, BulkOpListener listener, Hints hints) {
         throw new UnsupportedOperationException("This method is not yet implemented");
     }
 

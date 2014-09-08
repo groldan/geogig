@@ -14,9 +14,9 @@ import java.io.OutputStream;
 import org.locationtech.geogig.api.ObjectId;
 import org.locationtech.geogig.api.RevObject;
 import org.locationtech.geogig.api.RevObject.TYPE;
+import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.storage.ObjectReader;
 import org.locationtech.geogig.storage.ObjectWriter;
-import org.locationtech.geogig.storage.datastream.DataStreamSerializationFactoryV2.ObjectReaderV2;
 
 import com.google.common.base.Throwables;
 
@@ -33,16 +33,27 @@ abstract class Serializer<T extends RevObject> implements ObjectReader<T>, Objec
 
     @Override
     public T read(ObjectId id, InputStream rawData) throws IllegalArgumentException {
+        return read(id, rawData, Hints.nil());
+    }
+
+    @Override
+    public T read(ObjectId id, InputStream rawData, Hints hints) throws IllegalArgumentException {
         DataInput in = new DataInputStream(rawData);
         try {
             requireHeader(in, header);
-            return readBody(id, in);
+            return readBody(id, in, hints);
         } catch (IOException e) {
             throw Throwables.propagate(e);
         }
     }
 
-    protected abstract T readBody(ObjectId id, DataInput in) throws IOException;
+    protected T readBody(ObjectId id, DataInput in) throws IOException {
+        throw new UnsupportedOperationException("Must override");
+    }
+
+    protected T readBody(ObjectId id, DataInput in, Hints hints) throws IOException {
+        return readBody(id, in);
+    }
 
     /**
      * Writers must call

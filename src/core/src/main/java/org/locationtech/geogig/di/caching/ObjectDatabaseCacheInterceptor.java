@@ -28,6 +28,7 @@ import org.locationtech.geogig.api.RevTag;
 import org.locationtech.geogig.api.RevTree;
 import org.locationtech.geogig.api.plumbing.merge.Conflict;
 import org.locationtech.geogig.di.Decorator;
+import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.storage.BulkOpListener;
 import org.locationtech.geogig.storage.ForwardingObjectDatabase;
 import org.locationtech.geogig.storage.ObjectDatabase;
@@ -147,9 +148,10 @@ class ObjectDatabaseCacheInterceptor {
         }
 
         @Override
-        public @Nullable <T extends RevObject> T getIfPresent(ObjectId id, Class<T> type) {
+        public @Nullable RevObject getIfPresent(ObjectId id, Hints hints)
+                throws IllegalArgumentException {
             RevObject object = cache.getIfPresent(id, super.subject.get());
-            return object == null ? null : type.cast(object);
+            return object == null ? null : object;
         }
 
         @Override
@@ -190,12 +192,13 @@ class ObjectDatabaseCacheInterceptor {
 
         @Override
         public Iterator<RevObject> getAll(final Iterable<ObjectId> ids) {
-            return getAll(ids, BulkOpListener.NOOP_LISTENER);
+            return getAll(ids, BulkOpListener.NOOP_LISTENER, Hints.nil());
         }
 
         @Override
-        public Iterator<RevObject> getAll(final Iterable<ObjectId> ids, BulkOpListener listener) {
-            return cache.getAll(ids, listener, super.subject.get());
+        public Iterator<RevObject> getAll(final Iterable<ObjectId> ids, BulkOpListener listener,
+                Hints hints) {
+            return cache.getAll(ids, listener, super.subject.get(), hints);
         }
 
         @Override
@@ -278,7 +281,7 @@ class ObjectDatabaseCacheInterceptor {
         }
 
         public Iterator<RevObject> getAll(final Iterable<ObjectId> ids,
-                final BulkOpListener listener, final ObjectDatabase db) {
+                final BulkOpListener listener, final ObjectDatabase db, final Hints hints) {
 
             final int partitionSize = 10_000;
             Iterable<List<ObjectId>> partition = Iterables.partition(ids, partitionSize);
@@ -305,7 +308,7 @@ class ObjectDatabaseCacheInterceptor {
             if (!miss.isEmpty()) {
                 Iterator<RevObject> iterator = new AbstractIterator<RevObject>() {
 
-                    private Iterator<RevObject> delegate = db.getAll(miss, listener);
+                    private Iterator<RevObject> delegate = db.getAll(miss, listener, hints);
 
                     @Override
                     protected RevObject computeNext() {
