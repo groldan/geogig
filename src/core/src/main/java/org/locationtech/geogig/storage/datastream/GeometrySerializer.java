@@ -27,8 +27,6 @@ import com.vividsolutions.jts.geom.impl.PackedCoordinateSequenceFactory;
  */
 class GeometrySerializer extends ValueSerializer {
 
-    private static final double DEFAULT_FIXED_PRECISION_FACTOR = 1e9;
-
     private static final CoordinateSequenceFactory DEFAULT_COORDINATE_SEQUENCE_FACTORY = new PackedCoordinateSequenceFactory();
 
     private static final GeometryEncoder GEOMETRY_ENCODER = GeometryEncoder.INSTANCE;

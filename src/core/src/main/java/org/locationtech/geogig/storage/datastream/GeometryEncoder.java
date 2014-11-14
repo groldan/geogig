@@ -197,27 +197,22 @@ class GeometryEncoder {
             final double scale, final boolean writeLength) throws IOException {
 
         final int size = seq.size();
-
-        long previousX = 0;
-
-        long previousY = 0;
+        final int dim = seq.getDimension();
 
         if (writeLength) {
             writeUnsignedVarInt(size, out);
         }
-        for (int i = 0; i < size; i++) {
-            double x = seq.getOrdinate(i, 0);
-            double y = seq.getOrdinate(i, 1);
+        out.writeByte(dim);
+        for (int dimension = 0; dimension < dim; dimension++) {
+            long previous = 0;
+            for (int index = 0; index < size; index++) {
+                double ordinate = seq.getOrdinate(index, dimension);
 
-            long fixedX = toFixedPrecision(x, scale);
-            long fixedY = toFixedPrecision(y, scale);
-
-            long deltaX = fixedX - previousX;
-            long deltaY = fixedY - previousY;
-            previousX = fixedX;
-            previousY = fixedY;
-            writeSignedVarLong(deltaX, out);
-            writeSignedVarLong(deltaY, out);
+                long fixedPrecisionOrdinate = toFixedPrecision(ordinate, scale);
+                long delta = fixedPrecisionOrdinate - previous;
+                previous = fixedPrecisionOrdinate;
+                writeSignedVarLong(delta, out);
+            }
         }
     }
 
@@ -235,34 +230,28 @@ class GeometryEncoder {
     static final CoordinateSequence readSequence(DataInput in, GeometryFactory factory,
             final int size, double scale) throws IOException {
 
-        long deltaX;
-        long deltaY;
+        final int dim = in.readByte();
+        CoordinateSequence seq = factory.getCoordinateSequenceFactory().create(size, dim);
 
-        long fixedX = readSignedVarLong(in);
-        long fixedY = readSignedVarLong(in);
-        double x = toDoublePrecision(fixedX, scale);
-        double y = toDoublePrecision(fixedY, scale);
+        for (int dimension = 0; dimension < dim; dimension++) {
 
-        CoordinateSequence seq = factory.getCoordinateSequenceFactory().create(size, 2);
-        seq.setOrdinate(0, 0, x);
-        seq.setOrdinate(0, 1, y);
+            long fixedOrdinate = readSignedVarLong(in);
+            double ordinate = toDoublePrecision(fixedOrdinate, scale);
+            seq.setOrdinate(0, dimension, ordinate);
 
-        for (int i = 1; i < size; i++) {
-            deltaX = readSignedVarLong(in);
-            deltaY = readSignedVarLong(in);
+            long delta;
+            for (int index = 1; index < size; index++) {
+                delta = readSignedVarLong(in);
 
-            fixedX += deltaX;
-            fixedY += deltaY;
+                fixedOrdinate += delta;
 
-            x = toDoublePrecision(fixedX, scale);
-            y = toDoublePrecision(fixedY, scale);
-            if (Double.isInfinite(x) || Double.isInfinite(y) || Double.isNaN(x) || Double.isNaN(y)) {
-                throw new IllegalArgumentException();
+                ordinate = toDoublePrecision(fixedOrdinate, scale);
+                if (Double.isInfinite(ordinate) || Double.isNaN(ordinate)) {
+                    throw new IllegalArgumentException();
+                }
+                seq.setOrdinate(index, dimension, ordinate);
             }
-            seq.setOrdinate(i, 0, x);
-            seq.setOrdinate(i, 1, y);
         }
-
         return seq;
     }
 
