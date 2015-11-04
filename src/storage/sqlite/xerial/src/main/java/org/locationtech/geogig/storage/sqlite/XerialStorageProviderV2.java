@@ -13,20 +13,20 @@ import org.locationtech.geogig.di.StorageProvider;
 import org.locationtech.geogig.di.VersionedFormat;
 import org.locationtech.geogig.storage.fs.FileRefDatabase;
 
-public class XerialStorageProvider extends StorageProvider {
+public class XerialStorageProviderV2 extends StorageProvider {
 
-    private static final String NAME = SQLiteStorage.FORMAT_NAME;
+    private static final String NAME = "sqlite";
 
-    private static final String VERSION = SQLiteStorage.VERSION;
+    private static final String VERSION = "0.2";
 
     private static final VersionedFormat REFS = new VersionedFormat("file", "1.0",
             FileRefDatabase.class);
 
-    private static final VersionedFormat GRAPH = new VersionedFormat(NAME, VERSION,
-            XerialGraphDatabase.class);
+    static final VersionedFormat OBJECT = new VersionedFormat(NAME, VERSION,
+            XerialObjectDatabaseV2.class);
 
-    private static final VersionedFormat OBJECT = new VersionedFormat(NAME, VERSION,
-            XerialObjectDatabase.class);
+    static final VersionedFormat GRAPH = new VersionedFormat(NAME, VERSION,
+            XerialGraphDatabaseV2.class);
 
     @Override
     public String getName() {

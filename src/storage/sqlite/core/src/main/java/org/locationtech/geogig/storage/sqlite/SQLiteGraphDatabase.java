@@ -9,9 +9,6 @@
  */
 package org.locationtech.geogig.storage.sqlite;
 
-import static org.locationtech.geogig.storage.sqlite.SQLiteStorage.FORMAT_NAME;
-import static org.locationtech.geogig.storage.sqlite.SQLiteStorage.VERSION;
-
 import java.io.File;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -20,6 +17,7 @@ import java.util.Queue;
 
 import org.locationtech.geogig.api.ObjectId;
 import org.locationtech.geogig.api.Platform;
+import org.locationtech.geogig.di.VersionedFormat;
 import org.locationtech.geogig.repository.RepositoryConnectionException;
 import org.locationtech.geogig.storage.ConfigDatabase;
 import org.locationtech.geogig.storage.GraphDatabase;
@@ -43,9 +41,12 @@ public abstract class SQLiteGraphDatabase<T> implements GraphDatabase {
 
     private T cx;
 
-    public SQLiteGraphDatabase(ConfigDatabase configdb, Platform platform) {
+    private final VersionedFormat version;
+
+    public SQLiteGraphDatabase(ConfigDatabase configdb, Platform platform, VersionedFormat version) {
         this.configdb = configdb;
         this.platform = platform;
+        this.version = version;
     }
 
     @Override
@@ -58,12 +59,14 @@ public abstract class SQLiteGraphDatabase<T> implements GraphDatabase {
 
     @Override
     public void configure() throws RepositoryConnectionException {
-        RepositoryConnectionException.StorageType.GRAPH.configure(configdb, FORMAT_NAME, VERSION);
+        RepositoryConnectionException.StorageType.GRAPH.configure(configdb, version.getFormat(),
+                version.getVersion());
     }
 
     @Override
     public void checkConfig() throws RepositoryConnectionException {
-        RepositoryConnectionException.StorageType.GRAPH.verify(configdb, FORMAT_NAME, VERSION);
+        RepositoryConnectionException.StorageType.GRAPH.verify(configdb, version.getFormat(),
+                version.getVersion());
     }
 
     @Override

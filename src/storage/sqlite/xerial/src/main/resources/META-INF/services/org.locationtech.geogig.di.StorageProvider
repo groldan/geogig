@@ -1,1 +1,2 @@
-org.locationtech.geogig.storage.sqlite.XerialStorageProvider
+org.locationtech.geogig.storage.sqlite.XerialStorageProviderV1
+org.locationtech.geogig.storage.sqlite.XerialStorageProviderV2

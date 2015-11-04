@@ -27,6 +27,7 @@ import java.util.List;
 
 import javax.sql.DataSource;
 
+import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.api.ObjectId;
 import org.locationtech.geogig.api.Platform;
 import org.locationtech.geogig.api.RevObject;
@@ -48,9 +49,9 @@ import com.google.inject.Inject;
  * 
  * @author Justin Deoliveira, Boundless
  */
-public class XerialObjectDatabase extends SQLiteObjectDatabase<DataSource> {
+public class XerialObjectDatabaseV1 extends SQLiteObjectDatabase<DataSource> {
 
-    static Logger LOG = LoggerFactory.getLogger(XerialObjectDatabase.class);
+    static Logger LOG = LoggerFactory.getLogger(XerialObjectDatabaseV1.class);
 
     static final String OBJECTS = "objects";
 
@@ -62,33 +63,21 @@ public class XerialObjectDatabase extends SQLiteObjectDatabase<DataSource> {
 
     private FileBlobStore blobStore;
 
-    private final boolean readOnly;
-
     @Inject
-    public XerialObjectDatabase(ConfigDatabase configdb, Platform platform, Hints hints) {
-        this(configdb, platform, "objects", readOnly(hints));
+    public XerialObjectDatabaseV1(ConfigDatabase configdb, Platform platform, Hints hints) {
+        this(configdb, platform, "objects", hints);
     }
 
-    private static boolean readOnly(Hints hints) {
-        return hints == null ? false : hints.getBoolean(Hints.OBJECTS_READ_ONLY);
-    }
-
-    public XerialObjectDatabase(final ConfigDatabase configdb, final Platform platform,
-            final String dbName, final boolean readOnly) {
-        super(configdb, platform);
+    public XerialObjectDatabaseV1(final ConfigDatabase configdb, final Platform platform,
+            final String dbName, final @Nullable Hints hints) {
+        super(configdb, platform, hints, XerialStorageProviderV1.OBJECT);
         this.dbName = dbName;
-        this.readOnly = readOnly;
-    }
-
-    @Override
-    public boolean isReadOnly() {
-        return false;
     }
 
     @Override
     protected DataSource connect(File geogigDir) {
         File file = new File(geogigDir, dbName + ".db");
-        return Xerial.newDataSource(file, readOnly);
+        return Xerial.newDataSource(file, isReadOnly());
     }
 
     @Override
@@ -127,14 +116,14 @@ public class XerialObjectDatabase extends SQLiteObjectDatabase<DataSource> {
     }
 
     @Override
-    public boolean has(final String id, DataSource ds) {
+    public boolean has(final ObjectId id, DataSource ds) {
         return new DbOp<Boolean>() {
             @Override
             protected Boolean doRun(Connection cx) throws SQLException {
                 String sql = format("SELECT count(*) FROM %s WHERE id = ?", OBJECTS);
 
                 try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, id))) {
-                    ps.setString(1, id);
+                    ps.setString(1, id.toString());
 
                     try (ResultSet rs = ps.executeQuery()) {
                         rs.next();
@@ -170,7 +159,7 @@ public class XerialObjectDatabase extends SQLiteObjectDatabase<DataSource> {
     }
 
     @Override
-    public InputStream get(final String id, DataSource ds) {
+    public InputStream get(final ObjectId id, DataSource ds) {
         return new DbOp<InputStream>() {
             @Override
             protected InputStream doRun(Connection cx) throws SQLException {
@@ -178,7 +167,7 @@ public class XerialObjectDatabase extends SQLiteObjectDatabase<DataSource> {
 
                 InputStream in = null;
                 try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, id))) {
-                    ps.setString(1, id);
+                    ps.setString(1, id.toString());
 
                     try (ResultSet rs = ps.executeQuery()) {
                         if (rs.next()) {
@@ -193,14 +182,14 @@ public class XerialObjectDatabase extends SQLiteObjectDatabase<DataSource> {
     }
 
     @Override
-    public void put(final String id, final InputStream obj, DataSource ds) {
+    public void put(final ObjectId id, final InputStream obj, DataSource ds) {
         new DbOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws SQLException, IOException {
                 String sql = format("INSERT OR IGNORE INTO %s (id,object) VALUES (?,?)", OBJECTS);
 
                 try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, id, obj))) {
-                    ps.setString(1, id);
+                    ps.setString(1, id.toString());
                     ps.setBytes(2, ByteStreams.toByteArray(obj));
                     ps.executeUpdate();
                 }
@@ -210,14 +199,14 @@ public class XerialObjectDatabase extends SQLiteObjectDatabase<DataSource> {
     }
 
     @Override
-    public boolean delete(final String id, DataSource ds) {
+    public boolean delete(final ObjectId id, DataSource ds) {
         return new DbOp<Boolean>() {
             @Override
             protected Boolean doRun(Connection cx) throws SQLException {
                 String sql = format("DELETE FROM %s WHERE id = ?", OBJECTS);
 
                 try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, id))) {
-                    ps.setString(1, id);
+                    ps.setString(1, id.toString());
 
                     int updateCount = ps.executeUpdate();
                     return updateCount > 0;

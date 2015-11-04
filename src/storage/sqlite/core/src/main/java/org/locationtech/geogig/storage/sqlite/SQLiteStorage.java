@@ -24,15 +24,6 @@ import com.google.common.base.Preconditions;
  * @author Justin Deoliveira, Boundless
  */
 public class SQLiteStorage {
-    /**
-     * Format name used for configuration.
-     */
-    public static final String FORMAT_NAME = "sqlite";
-
-    /**
-     * Implementation version.
-     */
-    public static final String VERSION = "0.1";
 
     /**
      * Returns the .geogig directory for the platform object.

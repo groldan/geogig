@@ -34,8 +34,8 @@ public class XerialSQLiteModule extends AbstractModule {
     @Override
     protected void configure() {
         bind(ConfigDatabase.class).to(XerialConfigDatabase.class).in(Scopes.SINGLETON);
-        bind(ObjectDatabase.class).to(XerialObjectDatabase.class).in(Scopes.SINGLETON);
-        bind(GraphDatabase.class).to(XerialGraphDatabase.class).in(Scopes.SINGLETON);
+        bind(ObjectDatabase.class).to(XerialObjectDatabaseV1.class).in(Scopes.SINGLETON);
+        bind(GraphDatabase.class).to(XerialGraphDatabaseV1.class).in(Scopes.SINGLETON);
     }
 
 }

@@ -19,8 +19,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-import javax.sql.DataSource;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,32 +29,28 @@ import com.google.inject.Inject;
  * 
  * @author Justin Deoliveira, Boundless
  */
-class XerialConflictsDatabase extends SQLiteConflictsDatabase<DataSource> {
+class XerialConflictsDatabaseSingleConnection extends SQLiteConflictsDatabase<Connection> {
 
-    final static Logger LOG = LoggerFactory.getLogger(XerialConflictsDatabase.class);
+    final static Logger LOG = LoggerFactory
+            .getLogger(XerialConflictsDatabaseSingleConnection.class);
 
     final static String CONFLICTS = "conflicts";
 
     @Inject
-    public XerialConflictsDatabase(DataSource ds) {
+    public XerialConflictsDatabaseSingleConnection(Connection ds) {
         super(ds);
     }
 
     @Override
-    protected void init(DataSource ds) {
+    protected void init(Connection ds) {
         new DbOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws SQLException {
                 String sql = format("CREATE TABLE IF NOT EXISTS %s (namespace VARCHAR, "
                         + "path VARCHAR, conflict VARCHAR, PRIMARY KEY(namespace,path))", CONFLICTS);
 
-                cx.setAutoCommit(false);
                 try (Statement statement = cx.createStatement()) {
                     statement.execute(log(sql, LOG));
-                    cx.commit();
-                } catch (SQLException e) {
-                    cx.rollback();
-                    throw e;
                 }
 
                 return null;
@@ -65,7 +59,7 @@ class XerialConflictsDatabase extends SQLiteConflictsDatabase<DataSource> {
     }
 
     @Override
-    protected int count(final String namespace, DataSource ds) {
+    protected int count(final String namespace, Connection cx) {
         Integer count = new DbOp<Integer>() {
             @Override
             protected Integer doRun(Connection cx) throws IOException, SQLException {
@@ -82,14 +76,13 @@ class XerialConflictsDatabase extends SQLiteConflictsDatabase<DataSource> {
                     return Integer.valueOf(count);
                 }
             }
-        }.run(ds);
+        }.run(cx);
 
         return count.intValue();
     }
 
     @Override
-    protected Iterable<String> get(final String namespace, final String pathFilter, DataSource ds) {
-        Connection cx = Xerial.newConnection(ds);
+    protected Iterable<String> get(final String namespace, final String pathFilter, Connection cx) {
         ResultSet rs = new DbOp<ResultSet>() {
             @Override
             protected ResultSet doRun(Connection cx) throws IOException, SQLException {
@@ -110,7 +103,7 @@ class XerialConflictsDatabase extends SQLiteConflictsDatabase<DataSource> {
 
     @Override
     protected void put(final String namespace, final String path, final String conflict,
-            DataSource ds) {
+            Connection ds) {
         new DbOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws IOException, SQLException {
@@ -118,17 +111,12 @@ class XerialConflictsDatabase extends SQLiteConflictsDatabase<DataSource> {
 
                 log(sql, LOG, namespace, path, conflict);
 
-                cx.setAutoCommit(false);
                 try (PreparedStatement ps = cx.prepareStatement(sql)) {
                     ps.setString(1, namespace);
                     ps.setString(2, path);
                     ps.setString(3, conflict);
 
                     ps.executeUpdate();
-                    cx.commit();
-                } catch (SQLException e) {
-                    cx.rollback();
-                    throw e;
                 }
                 return null;
             }
@@ -136,7 +124,7 @@ class XerialConflictsDatabase extends SQLiteConflictsDatabase<DataSource> {
     }
 
     @Override
-    protected void remove(final String namespace, final String path, DataSource ds) {
+    protected void remove(final String namespace, final String path, Connection ds) {
         new DbOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws IOException, SQLException {
@@ -144,15 +132,10 @@ class XerialConflictsDatabase extends SQLiteConflictsDatabase<DataSource> {
 
                 log(sql, LOG, namespace, path);
 
-                cx.setAutoCommit(false);
                 try (PreparedStatement ps = cx.prepareStatement(sql)) {
                     ps.setString(1, namespace);
                     ps.setString(2, path);
                     ps.executeUpdate();
-                    cx.commit();
-                } catch (SQLException e) {
-                    cx.rollback();
-                    throw e;
                 }
                 return null;
             }

@@ -36,7 +36,7 @@ public class Xerial {
     /**
      * Default synchronization setting, see {@link #turnSynchronizationOff()}
      */
-    private static SynchronousMode DEFAULT_SYNC_MODE = SynchronousMode.NORMAL;
+    private static SynchronousMode DEFAULT_SYNC_MODE = SynchronousMode.OFF;
 
     /**
      * Turns SQLite synchronization off.
@@ -91,6 +91,12 @@ public class Xerial {
         dataSource.setReadOnly(readOnly);
         dataSource.setUrl("jdbc:sqlite:" + db.getAbsolutePath());
         dataSource.setSynchronous(DEFAULT_SYNC_MODE.getValue());
+        final int MAX_PAGE_SIZE = 65536;
+        dataSource.setPageSize(MAX_PAGE_SIZE);
+        dataSource.setSharedCache(true);
+        dataSource.setReadUncommited(true);
+        //dataSource.setCacheSize(10_000);
+        dataSource.setLockingMode("NORMAL");
         return dataSource;
     }
 

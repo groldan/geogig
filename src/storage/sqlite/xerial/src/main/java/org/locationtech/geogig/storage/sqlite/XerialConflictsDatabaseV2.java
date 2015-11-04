@@ -21,6 +21,7 @@ import java.sql.Statement;
 
 import javax.sql.DataSource;
 
+import org.locationtech.geogig.storage.sqlite.SQLiteTransactionHandler.WriteOp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,20 +32,23 @@ import com.google.inject.Inject;
  * 
  * @author Justin Deoliveira, Boundless
  */
-class XerialConflictsDatabase extends SQLiteConflictsDatabase<DataSource> {
+class XerialConflictsDatabaseV2 extends SQLiteConflictsDatabase<DataSource> {
 
-    final static Logger LOG = LoggerFactory.getLogger(XerialConflictsDatabase.class);
+    final static Logger LOG = LoggerFactory.getLogger(XerialConflictsDatabaseV2.class);
 
     final static String CONFLICTS = "conflicts";
 
+    private SQLiteTransactionHandler txHandler;
+
     @Inject
-    public XerialConflictsDatabase(DataSource ds) {
+    public XerialConflictsDatabaseV2(DataSource ds, SQLiteTransactionHandler txHandler) {
         super(ds);
+        this.txHandler = txHandler;
     }
 
     @Override
     protected void init(DataSource ds) {
-        new DbOp<Void>() {
+        WriteOp<Void> op = new WriteOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws SQLException {
                 String sql = format("CREATE TABLE IF NOT EXISTS %s (namespace VARCHAR, "
@@ -61,7 +65,8 @@ class XerialConflictsDatabase extends SQLiteConflictsDatabase<DataSource> {
 
                 return null;
             }
-        }.run(ds);
+        };
+        txHandler.runTx(op);
     }
 
     @Override
@@ -111,7 +116,8 @@ class XerialConflictsDatabase extends SQLiteConflictsDatabase<DataSource> {
     @Override
     protected void put(final String namespace, final String path, final String conflict,
             DataSource ds) {
-        new DbOp<Void>() {
+
+        WriteOp<Void> op = new WriteOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws IOException, SQLException {
                 String sql = format("INSERT OR REPLACE INTO %s VALUES (?,?,?)", CONFLICTS);
@@ -132,12 +138,13 @@ class XerialConflictsDatabase extends SQLiteConflictsDatabase<DataSource> {
                 }
                 return null;
             }
-        }.run(ds);
+        };
+        txHandler.runTx(op);
     }
 
     @Override
     protected void remove(final String namespace, final String path, DataSource ds) {
-        new DbOp<Void>() {
+        WriteOp<Void> op = new WriteOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws IOException, SQLException {
                 String sql = format("DELETE FROM %s WHERE namespace = ? AND path = ?", CONFLICTS);
@@ -156,7 +163,8 @@ class XerialConflictsDatabase extends SQLiteConflictsDatabase<DataSource> {
                 }
                 return null;
             }
-        }.run(ds);
+        };
+        txHandler.runTx(op);
     }
 
 }

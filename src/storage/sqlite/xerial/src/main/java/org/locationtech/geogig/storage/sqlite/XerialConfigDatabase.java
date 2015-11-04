@@ -19,6 +19,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import javax.sql.DataSource;
 
 import org.locationtech.geogig.api.Platform;
 import org.slf4j.Logger;
@@ -28,6 +31,8 @@ import org.sqlite.SQLiteDataSource;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 /**
  * Config database based on xerial SQLite jdbc driver.
@@ -38,7 +43,7 @@ public class XerialConfigDatabase extends SQLiteConfigDatabase {
 
     static final Logger LOG = LoggerFactory.getLogger(XerialConfigDatabase.class);
 
-    private SQLiteDataSource dataSource;
+    private DataSource dataSource;
 
     @Inject
     public XerialConfigDatabase(Platform platform) {
@@ -175,7 +180,14 @@ public class XerialConfigDatabase extends SQLiteConfigDatabase {
         new DbOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws IOException, SQLException {
-                doRemove(entry, cx);
+                cx.setAutoCommit(false);
+                try {
+                    doRemove(entry, cx);
+                    cx.commit();
+                } catch (SQLException e) {
+                    cx.rollback();
+                    throw e;
+                }
                 return null;
             }
         }.run(connect(config));
@@ -201,21 +213,35 @@ public class XerialConfigDatabase extends SQLiteConfigDatabase {
             @Override
             protected Void doRun(Connection cx) throws IOException, SQLException {
                 String sql = "DELETE FROM config WHERE section = ?";
-
+                cx.setAutoCommit(false);
                 try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, section))) {
                     ps.setString(1, section);
                     ps.executeUpdate();
+                    cx.commit();
+                } catch (SQLException e) {
+                    cx.rollback();
+                    throw e;
                 }
                 return null;
             }
         }.run(connect(config));
     }
 
-    synchronized SQLiteDataSource connect(Config config) {
+    synchronized DataSource connect(Config config) {
         if (dataSource != null) {
             return dataSource;
         }
-        dataSource = Xerial.newDataSource(config.file);
+
+        SQLiteDataSource sqliteds = Xerial.newDataSource(config.file);
+
+        HikariConfig poolConfig = new HikariConfig();
+        poolConfig.setMaximumPoolSize(10);
+        poolConfig.setDataSource(sqliteds);
+        poolConfig.setMinimumIdle(0);
+        poolConfig.setIdleTimeout(TimeUnit.SECONDS.toMillis(10));
+
+        HikariDataSource connPool = new HikariDataSource(poolConfig);
+
         new DbOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws IOException, SQLException {
@@ -234,13 +260,18 @@ public class XerialConfigDatabase extends SQLiteConfigDatabase {
                 }
                 return null;
             }
-        }.run(dataSource);
+        }.run(connPool);
 
-        return dataSource;
+        this.dataSource = connPool;
+        return connPool;
     }
 
     @Override
     public void close() throws IOException {
-        // nothing to do apparently
+        if (dataSource != null) {
+            ((HikariDataSource) dataSource).close();
+            dataSource = null;
+        }
     }
+
 }

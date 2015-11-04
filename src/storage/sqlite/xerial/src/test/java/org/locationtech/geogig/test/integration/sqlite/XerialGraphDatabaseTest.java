@@ -16,7 +16,7 @@ import org.locationtech.geogig.storage.ConfigDatabase;
 import org.locationtech.geogig.storage.GraphDatabase;
 import org.locationtech.geogig.storage.GraphDatabaseTest;
 import org.locationtech.geogig.storage.fs.IniFileConfigDatabase;
-import org.locationtech.geogig.storage.sqlite.XerialGraphDatabase;
+import org.locationtech.geogig.storage.sqlite.XerialGraphDatabaseV1;
 
 public class XerialGraphDatabaseTest extends GraphDatabaseTest {
     @Rule
@@ -25,6 +25,6 @@ public class XerialGraphDatabaseTest extends GraphDatabaseTest {
     @Override
     protected GraphDatabase createDatabase(Platform platform) throws Exception {
         ConfigDatabase configdb = new IniFileConfigDatabase(platform);
-        return new XerialGraphDatabase(configdb, platform);
+        return new XerialGraphDatabaseV1(configdb, platform);
     }
 }
