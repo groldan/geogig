@@ -448,10 +448,6 @@ public abstract class ObjectStoreConformanceTest {
                         e.getMessage().contains("must be at least 8 characters long"));
             }
         }
-        List<ObjectId> found = db.lookUp(fullId.substring(0, 9));
-        assertNotNull(found);
-        assertEquals(found.toString(), 1, found.size());
-        assertEquals(found.toString(), id1, found.get(0));
     }
 
     @Test

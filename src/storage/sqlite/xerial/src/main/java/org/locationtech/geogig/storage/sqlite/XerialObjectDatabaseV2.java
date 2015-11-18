@@ -1,4 +1,4 @@
-/* Copyright (c) 2014 Boundless and others.
+/* Copyright (c) 2015 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -22,7 +22,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -46,6 +45,7 @@ import org.sqlite.SQLiteDataSource;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
+import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
 import com.google.inject.Inject;
 import com.zaxxer.hikari.HikariConfig;
@@ -59,6 +59,22 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
     static Logger LOG = LoggerFactory.getLogger(XerialObjectDatabaseV2.class);
 
     static final String OBJECTS = "objects";
+
+    static final String INSERT_SQL = format("INSERT INTO %s (inthash,h2,h3,object) SELECT ?,?,?,?" + //
+            " WHERE NOT EXISTS (SELECT 1 FROM %s WHERE inthash=? AND h2=? AND h3=?)", OBJECTS,
+            OBJECTS);
+
+    static final String DELETE_SQL = format(
+            "DELETE FROM %s WHERE inthash = ? AND h2 = ? AND h3 = ?", OBJECTS);
+
+    static final String SELECT_SQL = format(
+            "SELECT object FROM %s WHERE inthash = ? AND h2=? AND h3=?", OBJECTS);
+
+    static final String LOOKUP_QUERY = format("SELECT inthash, h2, h3 FROM %s WHERE inthash = ?",
+            OBJECTS);
+
+    static final String EXISTS_QUERY = format(
+            "SELECT 1 FROM %s WHERE inthash = ? AND h2 = ? AND h3 = ?", OBJECTS);
 
     final int partitionSize = 50; // TODO make configurable
 
@@ -152,7 +168,8 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
                 // ROWID, cause the b-tree stores data in both leaf and intermediate nodes,
                 // __exploding__ the size of the WAL file. Badly.
                 String createTable = format(
-                        "CREATE TABLE IF NOT EXISTS %s (inthash int NOT NULL, id blob NOT NULL, object blob NOT NULL)",
+                        "CREATE TABLE IF NOT EXISTS %s "
+                                + "(inthash INTEGER NOT NULL, h2 INTEGER NOT NULL, h3 INTEGER NOT NULL, object blob NOT NULL)",
                         OBJECTS);
                 String createIndex = format(
                         "CREATE INDEX IF NOT EXISTS %s_inthash_idx ON %s(inthash) ", OBJECTS,
@@ -188,30 +205,21 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
         return new DbOp<Boolean>() {
             @Override
             protected Boolean doRun(Connection cx) throws SQLException {
-                String sql = format("SELECT id FROM %s WHERE inthash = ?", OBJECTS);
+                // "SELECT 1 FROM %s WHERE inthash = ? AND h2 = ? AND h3 = ?",OBJECTS);
 
-                int intHash = intHash(id);
-                try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, intHash, id))) {
-                    ps.setInt(1, intHash);
+                final ID dbId = ID.valueOf(id);
 
+                try (PreparedStatement ps = cx.prepareStatement(EXISTS_QUERY)) {
+                    ps.setInt(1, dbId.hash1());
+                    ps.setLong(2, dbId.hash2());
+                    ps.setLong(3, dbId.hash3());
                     try (ResultSet rs = ps.executeQuery()) {
-                        boolean found = seek(rs, id, 1);
+                        boolean found = rs.next();
                         return found;
                     }
                 }
             }
         }.run(ds);
-    }
-
-    private boolean seek(ResultSet rs, ObjectId id, int idFieldIndex) throws SQLException {
-        final byte[] rawId = id.getRawValue();
-        while (rs.next()) {
-            byte[] dbId = rs.getBytes(idFieldIndex);
-            if (Arrays.equals(rawId, dbId)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @Override
@@ -221,22 +229,26 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
         Preconditions.checkArgument(raw.length >= 4,
                 "Partial id must be at least 8 characters long: %s", partialId);
 
-        final int inthash = intHash(raw);
+        final int inthash = ID.intHash(raw);
 
         Iterable<String> matches = new DbOp<Iterable<String>>() {
             @Override
             protected Iterable<String> doRun(Connection cx) throws IOException, SQLException {
-                String sql = format("SELECT id FROM %s WHERE inthash = ? AND id LIKE ? LIMIT 100",
-                        OBJECTS, partialId);
-                final String searchKey = partialId + "%";
-                try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, inthash, searchKey))) {
+                // "SELECT inthash, h2, h3, object FROM %s WHERE inthash = ?", OBJECTS);
+
+                final String sql = LOOKUP_QUERY;
+                try (PreparedStatement ps = cx.prepareStatement(sql)) {
                     ps.setInt(1, inthash);
-                    ps.setString(2, searchKey);
 
                     List<String> matchList = new ArrayList<>();
                     try (ResultSet rs = ps.executeQuery()) {
                         while (rs.next()) {
-                            matchList.add(rs.getString(1));
+                            ObjectId id = ID.valueOf(rs.getInt(1), rs.getLong(2), rs.getLong(3))
+                                    .toObjectId();
+                            String stringId = id.toString();
+                            if (stringId.startsWith(partialId)) {
+                                matchList.add(stringId);
+                            }
                         }
                     }
                     return matchList;
@@ -251,17 +263,20 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
         return new DbOp<InputStream>() {
             @Override
             protected InputStream doRun(Connection cx) throws SQLException {
-                String sql = format("SELECT id, object FROM %s WHERE inthash = ?", OBJECTS);
+                // "SELECT object FROM %s WHERE inthash = ? AND h2=? AND h3=?",
+                // OBJECTS);
 
-                int intHash = intHash(id);
+                final ID dbId = ID.valueOf(id);
 
-                try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, intHash, id))) {
-                    ps.setInt(1, intHash);
+                try (PreparedStatement ps = cx.prepareStatement(SELECT_SQL)) {
+                    ps.setInt(1, dbId.hash1());
+                    ps.setLong(2, dbId.hash2());
+                    ps.setLong(3, dbId.hash3());
 
                     try (ResultSet rs = ps.executeQuery()) {
-                        boolean found = seek(rs, id, 1);
+                        final boolean found = rs.next();
                         if (found) {
-                            byte[] bytes = rs.getBytes(2);
+                            byte[] bytes = rs.getBytes(1);
                             return new ByteArrayInputStream(bytes);
                         }
                         return null;
@@ -272,22 +287,32 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
     }
 
     @Override
-    public void put(final ObjectId id, final InputStream obj, DataSource ds) {
+    public boolean put(final ObjectId id, final InputStream obj, DataSource ds) {
 
-        runTx(new SQLiteTransactionHandler.WriteOp<Void>() {
+        return runTx(new SQLiteTransactionHandler.WriteOp<Boolean>() {
             @Override
-            protected Void doRun(Connection cx) throws IOException, SQLException {
-                String sql = format("INSERT OR IGNORE INTO %s (inthash,id,object) VALUES (?,?,?)",
-                        OBJECTS);
+            protected Boolean doRun(Connection cx) throws IOException, SQLException {
+                // String sql =
+                // format("INSERT OR IGNORE INTO %s (inthash,id,object) VALUES (?,?,?)",
+                // OBJECTS);
 
-                int intHash = intHash(id);
+                // String sql = format("INSERT INTO %s (inthash,h2,h3,object) SELECT ?,?,?,?" + //
+                // " WHERE NOT EXISTS (SELECT 1 FROM %s WHERE inthash=? AND h2=? AND h3=?)",
+                // OBJECTS, OBJECTS);
 
-                try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, intHash, id, obj))) {
-                    ps.setInt(1, intHash);
-                    ps.setBytes(2, id.getRawValue());
-                    ps.setBytes(3, ByteStreams.toByteArray(obj));
-                    ps.executeUpdate();
-                    return null;
+                final ID dbId = ID.valueOf(id);
+
+                try (PreparedStatement ps = cx.prepareStatement(INSERT_SQL)) {
+                    ps.setInt(1, dbId.hash1());
+                    ps.setLong(2, dbId.hash2());
+                    ps.setLong(3, dbId.hash3());
+                    ps.setBytes(4, ByteStreams.toByteArray(obj));
+                    ps.setInt(5, dbId.hash1());
+                    ps.setLong(6, dbId.hash2());
+                    ps.setLong(7, dbId.hash3());
+
+                    int updateCount = ps.executeUpdate();
+                    return Boolean.valueOf(updateCount > 0);
                 }
             }
         });
@@ -298,14 +323,16 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
         return runTx(new SQLiteTransactionHandler.WriteOp<Boolean>() {
             @Override
             protected Boolean doRun(Connection cx) throws SQLException {
-                String sql = format("DELETE FROM %s WHERE inthash = ? AND id = ?", OBJECTS);
+                // "DELETE FROM %s WHERE inthash = ? AND h2 = ? AND h3 = ?", OBJECTS);
 
-                int intHash = intHash(id);
+                final ID dbId = ID.valueOf(id);
 
-                try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, intHash, id))) {
-                    ps.setInt(1, intHash);
-                    ps.setString(2, id.toString());
-                    return ps.executeUpdate() > 0;
+                try (PreparedStatement ps = cx.prepareStatement(DELETE_SQL)) {
+                    ps.setInt(1, dbId.hash1());
+                    ps.setLong(2, dbId.hash2());
+                    ps.setLong(3, dbId.hash3());
+                    final int updateCount = ps.executeUpdate();
+                    return updateCount > 0;
                 }
             }
         });
@@ -320,7 +347,9 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
      */
     @Override
     public void putAll(Iterator<? extends RevObject> objects, final BulkOpListener listener) {
-        Preconditions.checkState(isOpen(), "No open database connection");
+        Preconditions.checkNotNull(objects, "argument objects is null");
+        Preconditions.checkNotNull(listener, "argument listener is null");
+        checkWritable();
 
         // System.err.println("put allllllll");
         txHandler.startTransaction();
@@ -332,27 +361,41 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
 
                 @Override
                 protected Void doRun(Connection cx) throws IOException, SQLException {
-                    // use INSERT OR IGNORE to deal with duplicates cleanly
-                    String sql = format(
-                            "INSERT OR IGNORE INTO %s (inthash, id, object) VALUES (?,?,?)",
-                            OBJECTS);
+                    // String sql = format(
+                    // "INSERT OR IGNORE INTO %s (inthash, id, object) VALUES (?,?,?)",
+                    // OBJECTS);
+
+                    // final String sql = format(
+                    // "INSERT INTO %s (inthash,h2,h3,object) SELECT ?,?,?,?" + //
+                    // " WHERE NOT EXISTS (SELECT 1 FROM %s WHERE inthash=? AND h2=? AND h3=?)",
+                    // OBJECTS, OBJECTS);
 
                     // Stopwatch sw = Stopwatch.createStarted();
+
+                    final String sql = INSERT_SQL;
                     List<ObjectId> ids = new LinkedList<>();
-                    try (PreparedStatement stmt = cx.prepareStatement(log(sql, LOG))) {
+                    try (PreparedStatement ps = cx.prepareStatement(sql)) {
                         while (objs.hasNext()) {
                             RevObject obj = objs.next();
                             ObjectId id = obj.getId();
                             ids.add(id);
-                            stmt.setInt(1, intHash(id));
-                            stmt.setBytes(2, id.getRawValue());
-                            stmt.setBytes(3, ByteStreams.toByteArray(writeObject(obj)));
-                            stmt.addBatch();
+
+                            final ID dbId = ID.valueOf(id);
+
+                            ps.setInt(1, dbId.hash1());
+                            ps.setLong(2, dbId.hash2());
+                            ps.setLong(3, dbId.hash3());
+                            ps.setBytes(4, writeObject2(obj));
+                            ps.setInt(5, dbId.hash1());
+                            ps.setLong(6, dbId.hash2());
+                            ps.setLong(7, dbId.hash3());
+
+                            ps.addBatch();
                         }
 
-                        int[] batchResults = stmt.executeBatch();
+                        int[] batchResults = ps.executeBatch();
                         notifyInserted(batchResults, ids, listener);
-                        stmt.clearParameters();
+                        ps.clearParameters();
                     }
                     // System.err.printf("wrote %,d objects in %s on thread %s\n", ids.size(),
                     // sw.stop(), Thread.currentThread().getName());
@@ -367,6 +410,8 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
         for (int i = 0; i < inserted.length; i++) {
             if (inserted[i] > 0) {
                 listener.inserted(objects.get(i), null);
+            } else {
+                listener.found(objects.get(i), null);
             }
         }
     }
@@ -376,7 +421,9 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
      */
     @Override
     public long deleteAll(Iterator<ObjectId> ids, final BulkOpListener listener) {
-        Preconditions.checkState(isOpen(), "No open database connection");
+        Preconditions.checkNotNull(ids, "argument ids is null");
+        Preconditions.checkNotNull(listener, "argument listener is null");
+        checkWritable();
 
         txHandler.startTransaction();
         long totalCount = 0;
@@ -388,17 +435,19 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
 
                 @Override
                 protected Long doRun(Connection cx) throws IOException, SQLException {
-                    String sql = format("DELETE FROM %s WHERE inthash = ? AND id = ?", OBJECTS);
 
                     long count = 0;
-                    try (PreparedStatement stmt = cx.prepareStatement(log(sql, LOG))) {
+                    final String sql = DELETE_SQL;
+                    try (PreparedStatement stmt = cx.prepareStatement(sql)) {
 
                         // partition the objects into chunks for batch processing
                         List<ObjectId> ids = Lists.newArrayList(deleteIds);
 
                         for (ObjectId id : ids) {
-                            stmt.setInt(1, intHash(id));
-                            stmt.setString(2, id.toString());
+                            final ID dbId = ID.valueOf(id);
+                            stmt.setInt(1, dbId.hash1());
+                            stmt.setLong(2, dbId.hash2());
+                            stmt.setLong(3, dbId.hash3());
                             stmt.addBatch();
                         }
                         count += notifyDeleted(stmt.executeBatch(), ids, listener);
@@ -420,24 +469,89 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
             if (deleted[i] > 0) {
                 count++;
                 listener.deleted(ids.get(i));
+            } else {
+                listener.notFound(ids.get(i));
             }
         }
         return count;
     }
 
-    public static int intHash(ObjectId id) {
-        int hash1 = (id.byteN(0) << 24) //
-                + (id.byteN(1) << 16) //
-                + (id.byteN(2) << 8) //
-                + (id.byteN(3) << 0);
-        return hash1;
-    }
+    static final class ID {
 
-    public static int intHash(byte[] id) {
-        int hash1 = (id[0] << 24) //
-                + (id[1] << 16) //
-                + (id[2] << 8) //
-                + (id[3] << 0);
-        return hash1;
+        private final byte[] id;
+
+        public ID(byte[] oid) {
+            this.id = oid;
+        }
+
+        public static int intHash(ObjectId id) {
+            final int hash1 = ((id.byteN(0) << 24) //
+                    | (id.byteN(1) << 16) //
+                    | (id.byteN(2) << 8) //
+            | (id.byteN(3)));
+            return hash1;
+        }
+
+        public static int intHash(byte[] id) {
+            final int hash1 = ((((int) id[0]) << 24) //
+                    | (((int) id[1] & 0xFF) << 16) //
+                    | (((int) id[2] & 0xFF) << 8) //
+            | (((int) id[3] & 0xFF)));
+            return hash1;
+        }
+
+        public int hash1() {
+            return ID.intHash(this.id);
+        }
+
+        public long hash2() {
+            final long hash2 = ((((long) id[4]) << 56) //
+                    | (((long) id[5] & 0xFF) << 48)//
+                    | (((long) id[6] & 0xFF) << 40) //
+                    | (((long) id[7] & 0xFF) << 32) //
+                    | (((long) id[8] & 0xFF) << 24) //
+                    | (((long) id[9] & 0xFF) << 16) //
+                    | (((long) id[10] & 0xFF) << 8)//
+            | (((long) id[11] & 0xFF)));
+            return hash2;
+        }
+
+        public long hash3() {
+            final long hash3 = ((((long) id[12]) << 56) //
+                    | (((long) id[13] & 0xFF) << 48)//
+                    | (((long) id[14] & 0xFF) << 40) //
+                    | (((long) id[15] & 0xFF) << 32) //
+                    | (((long) id[16] & 0xFF) << 24) //
+                    | (((long) id[17] & 0xFF) << 16) //
+                    | (((long) id[18] & 0xFF) << 8)//
+            | (((long) id[19] & 0xFF)));
+            return hash3;
+        }
+
+        public ObjectId toObjectId() {
+            return ObjectId.createNoClone(id);
+        }
+
+        public static ID valueOf(ObjectId oid) {
+            return valueOf(oid.getRawValue());
+        }
+
+        public static ID valueOf(byte[] oid) {
+            return new ID(oid);
+        }
+
+        public static ID valueOf(final int h1, final long h2, final long h3) {
+            ByteArrayDataOutput out = ByteStreams.newDataOutput();
+            out.writeInt(h1);
+            out.writeLong(h2);
+            out.writeLong(h3);
+            byte[] raw = out.toByteArray();
+            return new ID(raw);
+        }
+
+        @Override
+        public String toString() {
+            return String.format("ID[%d, %d, %d]", hash1(), hash2(), hash3());
+        }
     }
 }

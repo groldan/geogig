@@ -182,7 +182,7 @@ public class XerialObjectDatabaseV1 extends SQLiteObjectDatabase<DataSource> {
     }
 
     @Override
-    public void put(final ObjectId id, final InputStream obj, DataSource ds) {
+    public boolean put(final ObjectId id, final InputStream obj, DataSource ds) {
         new DbOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws SQLException, IOException {
@@ -196,6 +196,7 @@ public class XerialObjectDatabaseV1 extends SQLiteObjectDatabase<DataSource> {
                 return null;
             }
         }.run(ds);
+        return true;
     }
 
     @Override

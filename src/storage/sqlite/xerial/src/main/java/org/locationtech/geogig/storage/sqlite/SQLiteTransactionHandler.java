@@ -1,3 +1,12 @@
+/* Copyright (c) 2015 Boundless and others.
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Distribution License v1.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/org/documents/edl-v10.html
+ *
+ * Contributors:
+ * Gabriel Roldan (Boundless) - initial implementation
+ */
 package org.locationtech.geogig.storage.sqlite;
 
 import java.io.IOException;
@@ -13,7 +22,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.sql.DataSource;
 
-import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
 
 class SQLiteTransactionHandler {

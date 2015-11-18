@@ -9,6 +9,8 @@
  */
 package org.locationtech.geogig.storage.sqlite;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
 
@@ -118,21 +120,27 @@ public abstract class SQLiteObjectDatabase<C> implements ObjectDatabase {
 
     @Override
     public boolean exists(ObjectId id) {
+        Preconditions.checkNotNull(id, "id is null");
+        checkOpen();
         return has(id, cx);
     }
 
     @Override
     public List<ObjectId> lookUp(String partialId) {
-        Preconditions.checkArgument(partialId.length() > 7,
-                "partial id must be at least 8 characters long: ", partialId);
+        checkNotNull(partialId, "argument partialId is null");
+        checkArgument(partialId.length() > 7, "partial id must be at least 8 characters long: ",
+                partialId);
+        checkOpen();
         return Lists.newArrayList(transform(search(partialId, cx), StringToObjectId.INSTANCE));
     }
 
     @Override
     public RevObject get(ObjectId id) throws IllegalArgumentException {
+        Preconditions.checkNotNull(id, "id is null");
+        checkOpen();
         RevObject obj = getIfPresent(id);
         if (obj == null) {
-            throw new IllegalArgumentException("No object with id: " + id);
+            throw new IllegalArgumentException("Object " + id + " does not exist");
         }
 
         return obj;
@@ -140,16 +148,20 @@ public abstract class SQLiteObjectDatabase<C> implements ObjectDatabase {
 
     @Override
     public <T extends RevObject> T get(ObjectId id, Class<T> type) throws IllegalArgumentException {
+        Preconditions.checkNotNull(id, "id is null");
+        Preconditions.checkNotNull(type, "type is null");
+        checkOpen();
         T obj = getIfPresent(id, type);
         if (obj == null) {
-            throw new IllegalArgumentException("No object with ids: " + id);
+            throw new IllegalArgumentException("Object " + id + " does not exist");
         }
-
         return obj;
     }
 
     @Override
     public RevObject getIfPresent(ObjectId id) {
+        Preconditions.checkNotNull(id, "id is null");
+        checkOpen();
         InputStream bytes = get(id, cx);
         try {
             return readObject(bytes, id);
@@ -161,7 +173,15 @@ public abstract class SQLiteObjectDatabase<C> implements ObjectDatabase {
     @Override
     public <T extends RevObject> T getIfPresent(ObjectId id, Class<T> type)
             throws IllegalArgumentException {
+        Preconditions.checkNotNull(id, "id is null");
+        Preconditions.checkNotNull(type, "type is null");
+        checkOpen();
         RevObject obj = getIfPresent(id);
+
+        if (!type.isInstance(obj)) {
+            return null;
+        }
+
         return obj != null ? type.cast(obj) : null;
     }
 
@@ -197,6 +217,9 @@ public abstract class SQLiteObjectDatabase<C> implements ObjectDatabase {
 
     @Override
     public Iterator<RevObject> getAll(Iterable<ObjectId> ids, final BulkOpListener listener) {
+        Preconditions.checkNotNull(ids, "ids is null");
+        Preconditions.checkNotNull(listener, "listener is null");
+        checkOpen();
         return filter(transform(ids, new Function<ObjectId, RevObject>() {
             @Override
             public RevObject apply(ObjectId id) {
@@ -213,13 +236,15 @@ public abstract class SQLiteObjectDatabase<C> implements ObjectDatabase {
 
     @Override
     public boolean put(RevObject object) {
+        checkNotNull(object, "argument object is null");
+        checkArgument(!object.getId().isNull(), "ObjectId is NULL %s", object);
+        checkWritable();
         ObjectId id = object.getId();
         try {
-            put(id, writeObject(object), cx);
+            return put(id, writeObject(object), cx);
         } catch (IOException e) {
             throw new RuntimeException("Unable to serialize object: " + object);
         }
-        return true;
     }
 
     @Override
@@ -229,6 +254,9 @@ public abstract class SQLiteObjectDatabase<C> implements ObjectDatabase {
 
     @Override
     public void putAll(Iterator<? extends RevObject> objects, BulkOpListener listener) {
+        checkNotNull(objects, "objects is null");
+        checkNotNull(listener, "listener is null");
+        checkWritable();
         while (objects.hasNext()) {
             RevObject obj = objects.next();
             if (put(obj)) {
@@ -239,6 +267,8 @@ public abstract class SQLiteObjectDatabase<C> implements ObjectDatabase {
 
     @Override
     public boolean delete(ObjectId objectId) {
+        Preconditions.checkNotNull(objectId, "argument id is null");
+        checkWritable();
         return delete(objectId, cx);
     }
 
@@ -249,6 +279,9 @@ public abstract class SQLiteObjectDatabase<C> implements ObjectDatabase {
 
     @Override
     public long deleteAll(Iterator<ObjectId> ids, BulkOpListener listener) {
+        Preconditions.checkNotNull(ids, "argument ids is null");
+        Preconditions.checkNotNull(listener, "argument listener is null");
+        checkWritable();
         long count = 0;
         while (ids.hasNext()) {
             ObjectId id = ids.next();
@@ -286,6 +319,25 @@ public abstract class SQLiteObjectDatabase<C> implements ObjectDatabase {
 
         serializer.write(object, bout);
         return new ByteArrayInputStream(bout.toByteArray());
+    }
+
+    protected byte[] writeObject2(RevObject object) throws IOException {
+        ByteArrayOutputStream bout = new ByteArrayOutputStream();
+
+        serializer.write(object, bout);
+
+        return bout.toByteArray();
+    }
+
+    protected void checkWritable() {
+        checkOpen();
+        if (readOnly) {
+            throw new IllegalStateException("database is read only.");
+        }
+    }
+
+    protected void checkOpen() {
+        Preconditions.checkState(isOpen(), "Database is closed");
     }
 
     /**
@@ -339,7 +391,7 @@ public abstract class SQLiteObjectDatabase<C> implements ObjectDatabase {
     /**
      * Inserts or updates the object with the specified id.
      */
-    protected abstract void put(ObjectId id, InputStream obj, C cx);
+    protected abstract boolean put(ObjectId id, InputStream obj, C cx);
 
     /**
      * Deletes the object with the specified id.
