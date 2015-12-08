@@ -27,6 +27,7 @@ import java.util.concurrent.Future;
 import org.eclipse.jdt.annotation.Nullable;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -41,6 +42,7 @@ import org.locationtech.geogig.api.RevPersonImpl;
 import org.locationtech.geogig.api.TestPlatform;
 import org.locationtech.geogig.storage.BulkOpListener.CountingListener;
 import org.locationtech.geogig.storage.fs.IniFileConfigDatabase;
+import org.locationtech.geogig.test.util.TestUtil;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -108,27 +110,35 @@ public abstract class ObjectDatabaseStressTest {
         testPutAll(100_000);
     }
 
-    @Ignore
     @Test
-    public void testPutAll_1M() throws Exception {
+    public void testPutAll_1M () throws Exception {
+        // use Assume instead of @Ignore. If the "dbStressTests" profile is not activated, Assume
+        // will skip this test. The "stressTests" profile will also activate dbStressTests.
+        Assume.assumeTrue(TestUtil.isDbStressTests());
         testPutAll(1000_000);
     }
 
-    @Ignore
     @Test
     public void testPutAll_5M() throws Exception {
+        // use Assume instead of @Ignore. If the "dbStressTests" profile is not activated, Assume
+        // will skip this test. The "stressTests" profile will also activate dbStressTests.
+        Assume.assumeTrue(TestUtil.isDbStressTests());
         testPutAll(5000_000);
     }
 
-    @Ignore
     @Test
     public void testPutAll_10M() throws Exception {
+        // use Assume instead of @Ignore. If the "dbStressTests" profile is not activated, Assume
+        // will skip this test. The "stressTests" profile will also activate dbStressTests.
+        Assume.assumeTrue(TestUtil.isDbStressTests());
         testPutAll(10_000_000);
     }
 
-    @Ignore
     @Test
     public void testPutAll_50M() throws Exception {
+        // use Assume instead of @Ignore. If the "dbStressTests" profile is not activated, Assume
+        // will skip this test. The "stressTests" profile will also activate dbStressTests.
+        Assume.assumeTrue(TestUtil.isDbStressTests());
         testPutAll(50_000_000);
     }
 

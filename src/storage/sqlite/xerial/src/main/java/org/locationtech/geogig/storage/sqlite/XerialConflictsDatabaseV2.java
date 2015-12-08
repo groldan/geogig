@@ -9,8 +9,15 @@
  */
 package org.locationtech.geogig.storage.sqlite;
 
-import static java.lang.String.format;
 import static org.locationtech.geogig.storage.sqlite.Xerial.log;
+import static org.locationtech.geogig.storage.sqlite.XerialConflictsDatabaseUtil.getCountConflictsSql;
+import static org.locationtech.geogig.storage.sqlite.XerialConflictsDatabaseUtil.getInitSql;
+import static org.locationtech.geogig.storage.sqlite.XerialConflictsDatabaseUtil.getInsertConflictSql;
+import static org.locationtech.geogig.storage.sqlite.XerialConflictsDatabaseUtil.getRemoveConflictsSql;
+import static org.locationtech.geogig.storage.sqlite.XerialConflictsDatabaseUtil.getRetrieveConflictsSql;
+import static org.locationtech.geogig.storage.sqlite.XerialConflictsDatabaseUtil.setInsertParams;
+import static org.locationtech.geogig.storage.sqlite.XerialConflictsDatabaseUtil.setNamespaceParam;
+import static org.locationtech.geogig.storage.sqlite.XerialConflictsDatabaseUtil.setRemoveConflictParams;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -18,6 +25,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Iterator;
 
 import javax.sql.DataSource;
 
@@ -36,8 +45,6 @@ class XerialConflictsDatabaseV2 extends SQLiteConflictsDatabase<DataSource> {
 
     final static Logger LOG = LoggerFactory.getLogger(XerialConflictsDatabaseV2.class);
 
-    final static String CONFLICTS = "conflicts";
-
     private SQLiteTransactionHandler txHandler;
 
     @Inject
@@ -51,8 +58,7 @@ class XerialConflictsDatabaseV2 extends SQLiteConflictsDatabase<DataSource> {
         WriteOp<Void> op = new WriteOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws SQLException {
-                String sql = format("CREATE TABLE IF NOT EXISTS %s (namespace VARCHAR, "
-                        + "path VARCHAR, conflict VARCHAR, PRIMARY KEY(namespace,path))", CONFLICTS);
+                String sql = getInitSql();
 
                 cx.setAutoCommit(false);
                 try (Statement statement = cx.createStatement()) {
@@ -74,10 +80,10 @@ class XerialConflictsDatabaseV2 extends SQLiteConflictsDatabase<DataSource> {
         Integer count = new DbOp<Integer>() {
             @Override
             protected Integer doRun(Connection cx) throws IOException, SQLException {
-                String sql = format("SELECT count(*) FROM %s WHERE namespace = ?", CONFLICTS);
+                String sql = getCountConflictsSql(namespace);
 
                 try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, namespace))) {
-                    ps.setString(1, namespace);
+                    setNamespaceParam(ps, namespace);
                     int count = 0;
                     try (ResultSet rs = ps.executeQuery()) {
                         while (rs.next()) {
@@ -94,23 +100,25 @@ class XerialConflictsDatabaseV2 extends SQLiteConflictsDatabase<DataSource> {
 
     @Override
     protected Iterable<String> get(final String namespace, final String pathFilter, DataSource ds) {
-        Connection cx = Xerial.newConnection(ds);
-        ResultSet rs = new DbOp<ResultSet>() {
+        Iterable<String> iterableString = new DbOp<Iterable<String>>() {
             @Override
-            protected ResultSet doRun(Connection cx) throws IOException, SQLException {
-                String sql = format(
-                        "SELECT conflict FROM %s WHERE namespace = ? AND path LIKE '%%%s%%'",
-                        CONFLICTS, pathFilter);
+            protected Iterable<String> doRun(Connection cx) throws IOException, SQLException {
+                final String sql = getRetrieveConflictsSql(namespace, pathFilter);
+                final StringIterable stringIterable = new StringIterable();
 
-                try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, namespace))) {
-                    ps.setString(1, namespace);
-
-                    return ps.executeQuery();
+                try(PreparedStatement ps = cx.prepareStatement(log(sql, LOG, namespace))) {
+                    setNamespaceParam(ps, namespace);
+                    ResultSet rs = ps.executeQuery();
+                    while (rs.next()) {
+                        String conflict = rs.getString(1);
+                        stringIterable.addString(conflict);
+                    }
                 }
+                return stringIterable;
             }
-        }.run(cx);
+        }.run(ds);
 
-        return new StringResultSetIterable(rs, cx);
+        return iterableString;
     }
 
     @Override
@@ -120,15 +128,13 @@ class XerialConflictsDatabaseV2 extends SQLiteConflictsDatabase<DataSource> {
         WriteOp<Void> op = new WriteOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws IOException, SQLException {
-                String sql = format("INSERT OR REPLACE INTO %s VALUES (?,?,?)", CONFLICTS);
+                String sql = getInsertConflictSql();
 
                 log(sql, LOG, namespace, path, conflict);
 
                 cx.setAutoCommit(false);
                 try (PreparedStatement ps = cx.prepareStatement(sql)) {
-                    ps.setString(1, namespace);
-                    ps.setString(2, path);
-                    ps.setString(3, conflict);
+                    setInsertParams(ps, namespace, path, conflict);
 
                     ps.executeUpdate();
                     cx.commit();
@@ -147,14 +153,14 @@ class XerialConflictsDatabaseV2 extends SQLiteConflictsDatabase<DataSource> {
         WriteOp<Void> op = new WriteOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws IOException, SQLException {
-                String sql = format("DELETE FROM %s WHERE namespace = ? AND path = ?", CONFLICTS);
+                String sql = getRemoveConflictsSql(namespace, path);
 
                 log(sql, LOG, namespace, path);
 
                 cx.setAutoCommit(false);
                 try (PreparedStatement ps = cx.prepareStatement(sql)) {
-                    ps.setString(1, namespace);
-                    ps.setString(2, path);
+                    // put the parameterized values in, if we have them
+                    setRemoveConflictParams(ps, namespace, path);
                     ps.executeUpdate();
                     cx.commit();
                 } catch (SQLException e) {
@@ -167,4 +173,17 @@ class XerialConflictsDatabaseV2 extends SQLiteConflictsDatabase<DataSource> {
         txHandler.runTx(op);
     }
 
+    private class StringIterable implements Iterable<String> {
+
+        private final ArrayList<String> strings = new ArrayList<>();
+
+        @Override
+        public Iterator<String> iterator() {
+            return this.strings.iterator();
+        }
+
+        private void addString(final String val) {
+            this.strings.add(val);
+        }
+    }
 }

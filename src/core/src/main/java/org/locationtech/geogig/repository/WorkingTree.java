@@ -13,6 +13,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -729,31 +730,8 @@ public class WorkingTree {
                     }
 
                 });
-        Iterator<RevObject> objects = Iterators.transform(filtered,
-                new Function<Feature, RevObject>() {
-
-                    private int count;
-
-                    @Override
-                    public RevFeature apply(Feature feature) {
-                        final RevFeature revFeature = RevFeatureBuilder.build(feature);
-                        ObjectId id = revFeature.getId();
-                        final Node node = insertHelper.put(id, feature);
-
-                        if (insertedTarget != null) {
-                            insertedTarget.add(node);
-                        }
-
-                        count++;
-                        if (collectionSize == null) {
-                            listener.setProgress(count);
-                        } else {
-                            listener.setProgress((float) (count * 100) / collectionSize.intValue());
-                        }
-                        return revFeature;
-                    }
-
-                });
+        Iterator<RevObject> objects = this.getRevObjectsFromFeatures(filtered, listener,
+            insertHelper, insertedTarget, collectionSize);
         try {
             listener.started();
 
@@ -953,5 +931,32 @@ public class WorkingTree {
         return context.command(FindTreeChild.class).setParent(getTree()).setChildPath(treePath)
                 .call().get();
 
+    }
+
+    private Iterator<RevObject> getRevObjectsFromFeatures (final Iterator<? extends Feature> filtered,
+        final ProgressListener listener, final WorkingTreeInsertHelper insertHelper,
+        final List<Node> insertedTarget, final Integer collectionSize) {
+
+        final ArrayList<RevObject> revObjects = new ArrayList<>();
+        int revObjectCount = 0;
+        while (filtered.hasNext()) {
+            final Feature feature = filtered.next();
+            final RevFeature revFeature = RevFeatureBuilder.build(feature);
+            final ObjectId id = revFeature.getId();
+            final Node node = insertHelper.put(id, feature);
+
+            if (insertedTarget != null) {
+                insertedTarget.add(node);
+            }
+
+            ++revObjectCount;
+            if (collectionSize == null) {
+                listener.setProgress(revObjectCount);
+            } else {
+                listener.setProgress((float) (revObjectCount * 100) / collectionSize.intValue());
+            }
+            revObjects.add(revFeature);
+        }
+        return revObjects.iterator();
     }
 }
