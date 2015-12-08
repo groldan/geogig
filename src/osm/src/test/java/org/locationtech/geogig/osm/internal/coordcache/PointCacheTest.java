@@ -19,8 +19,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -28,6 +28,7 @@ import org.junit.rules.TemporaryFolder;
 import org.locationtech.geogig.api.Platform;
 import org.locationtech.geogig.api.TestPlatform;
 import org.locationtech.geogig.osm.internal.OSMCoordinateSequence;
+import org.locationtech.geogig.test.util.TestUtil;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
@@ -128,27 +129,35 @@ public abstract class PointCacheTest extends Assert {
         testLargeSequences(1000 * 1000);
     }
 
-    @Ignore
     @Test
     public void testLargeSequences10M() {
+        // use Assume instead of @Ignore. If the "runLargeCacheTests" profile is not activated, Assume
+        // will skip this test. The "runLargeTests" profile will also activate runLargeCacheTests.
+        Assume.assumeTrue(TestUtil.isRunLargeCacheTests());
         testLargeSequences(10 * 1000 * 1000);
     }
 
-    @Ignore
     @Test
     public void testLargeSequences25M() {
+        // use Assume instead of @Ignore. If the "runLargeCacheTests" profile is not activated, Assume
+        // will skip this test. The "runLargeTests" profile will also activate runLargeCacheTests.
+        Assume.assumeTrue(TestUtil.isRunLargeCacheTests());
         testLargeSequences(25 * 1000 * 1000);
     }
 
-    @Ignore
     @Test
     public void testLargeSequences50M() {
+        // use Assume instead of @Ignore. If the "runLargeCacheTests" profile is not activated, Assume
+        // will skip this test. The "runLargeTests" profile will also activate runLargeCacheTests.
+        Assume.assumeTrue(TestUtil.isRunLargeCacheTests());
         testLargeSequences(50 * 1000 * 1000);
     }
 
-    @Ignore
     @Test
     public void testLargeSequences100M() {
+        // use Assume instead of @Ignore. If the "runLargeCacheTests" profile is not activated, Assume
+        // will skip this test. The "runLargeTests" profile will also activate runLargeCacheTests.
+        Assume.assumeTrue(TestUtil.isRunLargeCacheTests());
         testLargeSequences(100 * 1000 * 1000);
     }
 
@@ -157,32 +166,40 @@ public abstract class PointCacheTest extends Assert {
         testLargeSequencesNonSequentialQueries(1000 * 1000);
     }
 
-    @Ignore
     @Test
     public void testLargeSequencesNonSequentialQueries10M() {
+        // use Assume instead of @Ignore. If the "runLargeCacheTests" profile is not activated, Assume
+        // will skip this test. The "runLargeTests" profile will also activate runLargeCacheTests.
+        Assume.assumeTrue(TestUtil.isRunLargeCacheTests());
         testLargeSequencesNonSequentialQueries(10 * 1000 * 1000);
     }
 
-    @Ignore
     @Test
     public void testLargeSequencesNonSequentialQueries25M() {
+        // use Assume instead of @Ignore. If the "runLargeCacheTests" profile is not activated, Assume
+        // will skip this test. The "runLargeTests" profile will also activate runLargeCacheTests.
+        Assume.assumeTrue(TestUtil.isRunLargeCacheTests());
         testLargeSequencesNonSequentialQueries(25 * 1000 * 1000);
     }
 
-    @Ignore
     @Test
     public void testLargeSequencesNonSequentialQueries50M() {
+        // use Assume instead of @Ignore. If the "runLargeCacheTests" profile is not activated, Assume
+        // will skip this test. The "runLargeTests" profile will also activate runLargeCacheTests.
+        Assume.assumeTrue(TestUtil.isRunLargeCacheTests());
         testLargeSequencesNonSequentialQueries(50 * 1000 * 1000);
     }
 
-    @Ignore
     @Test
     public void testLargeSequencesNonSequentialQueries100M() {
+        // use Assume instead of @Ignore. If the "runLargeCacheTests" profile is not activated, Assume
+        // will skip this test. The "runLargeTests" profile will also activate runLargeCacheTests.
+        Assume.assumeTrue(TestUtil.isRunLargeCacheTests());
         testLargeSequencesNonSequentialQueries(100 * 1000 * 1000);
     }
 
     private void testLargeSequences(final int numNodes) {
-        List<Long> queryIds = new ArrayList<Long>(numNodes / 6);
+        List<Long> queryIds = new ArrayList<>(numNodes / 6);
 
         Stopwatch sw = Stopwatch.createUnstarted();
         final int bulkSize = 10_000;
@@ -216,7 +233,7 @@ public abstract class PointCacheTest extends Assert {
     }
 
     private void testLargeSequencesNonSequentialQueries(final int numNodes) {
-        List<Long> nodeIds = new ArrayList<Long>(numNodes / 6);
+        List<Long> nodeIds = new ArrayList<>(numNodes / 6);
         Stopwatch sw = Stopwatch.createStarted();
         for (int n = 0; n < numNodes; n++) {
             if (n % 20 == 0) {
