@@ -57,6 +57,10 @@ class XerialConflictsDatabaseV2 extends SQLiteConflictsDatabase<DataSource> {
         "DELETE FROM %s WHERE path = ?";
     private static final String REMOVE_CONFLICTS_NO_NAMESPACE_OR_PATH =
         "DELETE FROM %s";
+    private static final String COUNT_CONFLICTS_WITH_NAMESPACE =
+        "SELECT count(*) FROM %s WHERE namespace = ?";
+    private static final String COUNT_CONFLICTS_NO_NAMESPACE =
+        "SELECT count(*) FROM %s";
 
     private SQLiteTransactionHandler txHandler;
 
@@ -94,10 +98,12 @@ class XerialConflictsDatabaseV2 extends SQLiteConflictsDatabase<DataSource> {
         Integer count = new DbOp<Integer>() {
             @Override
             protected Integer doRun(Connection cx) throws IOException, SQLException {
-                String sql = format("SELECT count(*) FROM %s WHERE namespace = ?", CONFLICTS);
+                String sql = buildCountConflictsSql(namespace);
 
                 try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, namespace))) {
-                    ps.setString(1, namespace);
+                    if (null != namespace) {
+                        ps.setString(1, namespace);
+                    }
                     int count = 0;
                     try (ResultSet rs = ps.executeQuery()) {
                         while (rs.next()) {
@@ -185,6 +191,17 @@ class XerialConflictsDatabaseV2 extends SQLiteConflictsDatabase<DataSource> {
         };
         txHandler.runTx(op);
     }
+    
+    private String buildCountConflictsSql(final String namespace) {
+        if (null != namespace) {
+            // we have a namespcae
+            return format(XerialConflictsDatabaseV2.COUNT_CONFLICTS_WITH_NAMESPACE,
+                XerialConflictsDatabaseV2.CONFLICTS);
+        }
+        // no namespace
+        return format(XerialConflictsDatabaseV2.COUNT_CONFLICTS_NO_NAMESPACE,
+            XerialConflictsDatabaseV2.CONFLICTS);
+    }
 
     private String buildGetConflictsSql(final String namespace, final String pathFilter) {
         // need to build a select statement with the correct WHERE clause, if namespace and/or
@@ -201,7 +218,7 @@ class XerialConflictsDatabaseV2 extends SQLiteConflictsDatabase<DataSource> {
                 XerialConflictsDatabaseV2.CONFLICTS);
         }
         // we have no namespace, do we have a pathFilter?
-        if (null != pathFilter) {
+        if (null != pathFilter && !"null".equals(pathFilter)) {
             // we have a pathFilter
             return format(XerialConflictsDatabaseV2.GET_CONFLICTS_WITH_PATH,
                 XerialConflictsDatabaseV2.CONFLICTS, pathFilter);
@@ -224,7 +241,7 @@ class XerialConflictsDatabaseV2 extends SQLiteConflictsDatabase<DataSource> {
                 XerialConflictsDatabaseV2.CONFLICTS);
         }
         // we have no namespace, see if we have a path
-        if (null != path) {
+        if (null != path && !"null".equals(path)) {
             // we have a path but no namespace
             return format(XerialConflictsDatabaseV2.REMOVE_CONFLICTS_WITH_PATH,
                 XerialConflictsDatabaseV2.CONFLICTS);
@@ -245,7 +262,7 @@ class XerialConflictsDatabaseV2 extends SQLiteConflictsDatabase<DataSource> {
             }
         } else {
             // no namespace, do we have a path?
-            if (null != path) {
+            if (null != path && !"null".equals(path)) {
                 // we have only path, put it in index 1
                 ps.setString(1, path);
             }
