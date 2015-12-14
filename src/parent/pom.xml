@@ -441,7 +441,7 @@
             <exclude>${online.skip.pattern}</exclude>
 	   <exclude>${sqlServerOnline.skip.pattern}</exclude>
           </excludes>
-          <forkCount>1C</forkCount> <!-- i.e. 1 x # of processor cores -->
+          <forkCount>1</forkCount> <!-- i.e. 1 x # of processor cores -->
           <reuseForks>true</reuseForks>
           <argLine>-Xms256m -Xmx512m</argLine>
           <workingDirectory>${project.build.directory}</workingDirectory>

@@ -22,7 +22,7 @@ import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.storage.GraphDatabase;
 import org.locationtech.geogig.storage.ObjectDatabase;
 import org.locationtech.geogig.storage.RefDatabase;
-import org.locationtech.geogig.storage.bdbje.JEStorageProviderV02;
+import org.locationtech.geogig.storage.sqlite.XerialStorageProviderV2;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -31,7 +31,7 @@ import com.google.inject.util.Modules;
 
 public class CLIContextBuilder extends ContextBuilder {
 
-    private static final PluginDefaults defaults = new PluginDefaults(new JEStorageProviderV02());
+    private static final PluginDefaults defaults = new PluginDefaults(new XerialStorageProviderV2());
 
     @Override
     public Context build(Hints hints) {
