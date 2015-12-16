@@ -27,6 +27,26 @@
 
     mvn -Ponline
 
+ Running Object Database tests that have large amounts of data (i.e. putAll with 1 million records or more):
+
+    mvn test -PrunLargeDbTests
+
+  Running Node Index tests that have large amounts of nodes
+
+    mvn test -PrunLargeNodeTests
+
+  Running PointCache tests that have large sequences
+
+    mvn test -PrunLargeCacheTests
+
+  You can combine the "largeTest" profiles to run combinations of them, example:
+
+    mvn test -PrunLargeDbTests,runLargeNodeTests
+
+  You can run ALL the large tests with the "runLargeTests" profile activated:
+
+   mvn teat -PrunLargeTests
+
   To build additional support for commercial databases:
 
   * For SQL Server:
@@ -83,7 +103,7 @@
     <repository>
       <id>boundless</id>
       <name>Boundless Maven Repository</name>
-      <url>https://boundless.artifactoryonline.com/boundless/release/</url>
+      <url>https://boundless.artifactoryonline.com/boundless/main/</url>
       <snapshots>
         <enabled>true</enabled>
       </snapshots>
@@ -134,6 +154,9 @@
     <online.skip.pattern>**/*OnlineTest.java</online.skip.pattern>
     <sqlServerOnline.skip.pattern>**/*SQLServerFunctionalTest.java</sqlServerOnline.skip.pattern>
     <allow.test.skip>true</allow.test.skip>
+    <geogig.large.db.tests>disabled</geogig.large.db.tests>
+    <geogig.large.node.tests>disabled</geogig.large.node.tests>
+    <geogig.large.cache.tests>disabled</geogig.large.cache.tests>
   </properties>
 
   <dependencyManagement>
@@ -529,6 +552,73 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+    <!-- Large test profiles -->
+    <profile>
+        <id>runLargeDbTests</id>
+        <build>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <systemProperties>
+                            <geogig.large.db.tests>enabled</geogig.large.db.tests>
+                        </systemProperties>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </build>
+    </profile>
+    <profile>
+        <id>runLargeNodeTests</id>
+        <build>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <systemProperties>
+                            <geogig.large.node.tests>enabled</geogig.large.node.tests>
+                        </systemProperties>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </build>
+    </profile>
+    <profile>
+        <id>runLargeCacheTests</id>
+        <build>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <systemProperties>
+                            <geogig.large.cache.tests>enabled</geogig.large.cache.tests>
+                        </systemProperties>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </build>
+    </profile>
+    <profile>
+        <id>runLargeTests</id>
+        <build>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <systemProperties>
+                            <geogig.large.db.tests>enabled</geogig.large.db.tests>
+                            <geogig.large.node.tests>enabled</geogig.large.node.tests>
+                            <geogig.large.cache.tests>enabled</geogig.large.cache.tests>
+                        </systemProperties>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </build>
     </profile>
   </profiles>
 
