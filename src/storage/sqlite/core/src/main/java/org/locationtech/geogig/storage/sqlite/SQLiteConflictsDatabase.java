@@ -22,7 +22,7 @@ import com.google.common.collect.Lists;
  * Base class for SQLite based staging database.
  *
  * @author Justin Deoliveira, Boundless
- *
+ * 
  * @param <T>
  */
 public abstract class SQLiteConflictsDatabase<T> implements ConflictsDatabase {
@@ -57,7 +57,7 @@ public abstract class SQLiteConflictsDatabase<T> implements ConflictsDatabase {
     @Override
     public List<Conflict> getConflicts(String namespace, String pathFilter) {
         return Lists.newArrayList(Iterables.transform(get(namespace, pathFilter, cx),
-            StringToConflict.INSTANCE));
+                StringToConflict.INSTANCE));
     }
 
     @Override
@@ -86,7 +86,7 @@ public abstract class SQLiteConflictsDatabase<T> implements ConflictsDatabase {
      *
      * Implementations of this method should be prepared to be called multiple times, so must check
      * if the table already exists.
-     *
+     * 
      * @param cx The connection object.
      */
     protected abstract void init(T cx);
@@ -104,7 +104,7 @@ public abstract class SQLiteConflictsDatabase<T> implements ConflictsDatabase {
      *
      * @param namespace Namespace value, may be <code>null</code>.
      * @param pathFilter Path filter, may be <code>null</code>.
-     *
+     * 
      */
     protected abstract Iterable<String> get(String namespace, String pathFilter, T cx);
 
@@ -119,7 +119,7 @@ public abstract class SQLiteConflictsDatabase<T> implements ConflictsDatabase {
 
     /**
      * Removed a conflict.
-     *
+     * 
      * @param namespace The conflict namespace.
      * @param path The path of the conflict.
      */
