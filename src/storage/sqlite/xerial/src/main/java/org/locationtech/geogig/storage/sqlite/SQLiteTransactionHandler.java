@@ -9,7 +9,6 @@
  */
 package org.locationtech.geogig.storage.sqlite;
 
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.concurrent.Callable;
@@ -28,7 +27,7 @@ class SQLiteTransactionHandler {
 
     public static abstract class WriteOp<T> extends DbOp<T> {
 
-        protected abstract T doRun(Connection cx) throws IOException, SQLException;
+        // just a marker interface
 
     }
 
