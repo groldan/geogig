@@ -27,6 +27,28 @@
 
     mvn -Ponline
 
+  * Stress Testing
+
+    Running Object Database stress tests that have large amounts of data (i.e. putAll with 1 million records or more):
+
+      mvn test -PdbStressTests
+
+    Running Node Index tests that have large amounts of nodes
+
+      mvn test -PnodeStressTests
+
+    Running PointCache tests that have large sequences
+
+      mvn test -PcacheStressTests
+
+    You can combine the "StressTest" profiles to run combinations of them, example:
+
+      mvn test -PdbStressTests,nodeStressTests
+
+    You can run ALL the stress tests with the "stressTests" profile activated:
+
+      mvn teat -PstressTests
+
   To build additional support for commercial databases:
 
   * For SQL Server:
@@ -83,7 +105,7 @@
     <repository>
       <id>boundless</id>
       <name>Boundless Maven Repository</name>
-      <url>https://boundless.artifactoryonline.com/boundless/release/</url>
+      <url>https://boundless.artifactoryonline.com/boundless/main/</url>
       <snapshots>
         <enabled>true</enabled>
       </snapshots>
@@ -125,7 +147,8 @@
     <slf4j.version>1.7.5</slf4j.version>
     <sqljdbc4.version>3.0</sqljdbc4.version>
     <osmosis.version>0.43.1</osmosis.version>
-    <hikaricp.version>2.4.1</hikaricp.version>    
+    <hikaricp.version>2.4.1</hikaricp.version>
+    <sqlite.xerial.version>3.8.11.2</sqlite.xerial.version>
 
     <test.maxHeapSize>512M</test.maxHeapSize>
     <test.tmpDir>${project.build.directory}</test.tmpDir> <!-- use the provided tmp dir for tests, defaults to project's target/ directory -->
@@ -134,6 +157,9 @@
     <online.skip.pattern>**/*OnlineTest.java</online.skip.pattern>
     <sqlServerOnline.skip.pattern>**/*SQLServerFunctionalTest.java</sqlServerOnline.skip.pattern>
     <allow.test.skip>true</allow.test.skip>
+    <db.stress.tests>disabled</db.stress.tests>
+    <node.stress.tests>disabled</node.stress.tests>
+    <cache.stress.tests>disabled</cache.stress.tests>
   </properties>
 
   <dependencyManagement>
@@ -309,6 +335,12 @@
         <groupId>com.zaxxer</groupId>
         <artifactId>HikariCP</artifactId>
         <version>${hikaricp.version}</version>
+      </dependency>
+      <!-- SQLite Xerial backend driver -->
+      <dependency>
+          <groupId>org.xerial</groupId>
+          <artifactId>sqlite-jdbc</artifactId>
+          <version>${sqlite.xerial.version}</version>
       </dependency>
 
       <!-- Test scope dependencies -->
@@ -529,6 +561,73 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+    <!-- Large test profiles -->
+    <profile>
+        <id>dbStressTests</id>
+        <build>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <systemProperties>
+                            <db.stress.tests>enabled</db.stress.tests>
+                        </systemProperties>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </build>
+    </profile>
+    <profile>
+        <id>nodeStressTests</id>
+        <build>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <systemProperties>
+                            <node.stress.tests>enabled</node.stress.tests>
+                        </systemProperties>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </build>
+    </profile>
+    <profile>
+        <id>cacheStressTests</id>
+        <build>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <systemProperties>
+                            <cache.stress.tests>enabled</cache.stress.tests>
+                        </systemProperties>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </build>
+    </profile>
+    <profile>
+        <id>stressTests</id>
+        <build>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <systemProperties>
+                            <db.stress.tests>enabled</db.stress.tests>
+                            <node.stress.tests>enabled</node.stress.tests>
+                            <cache.stress.tests>enabled</cache.stress.tests>
+                        </systemProperties>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </build>
     </profile>
   </profiles>
 

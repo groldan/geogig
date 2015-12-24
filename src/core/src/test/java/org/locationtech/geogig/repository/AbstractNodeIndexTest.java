@@ -20,8 +20,8 @@ import java.util.concurrent.Executors;
 
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -31,6 +31,7 @@ import org.locationtech.geogig.api.Platform;
 import org.locationtech.geogig.api.RevObject.TYPE;
 import org.locationtech.geogig.api.TestPlatform;
 import org.locationtech.geogig.storage.NodeStorageOrder;
+import org.locationtech.geogig.test.util.TestUtil;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterators;
@@ -114,27 +115,35 @@ public abstract class AbstractNodeIndexTest extends Assert {
         testOrder(count);
     }
 
-    @Ignore
     @Test
     public void test5M() throws Exception {
+        // use Assume instead of @Ignore. If the "nodeStressTests" profile is not activated, Assume
+        // will skip this test. The "stressTests" profile will also activate nodeStressTests.
+        Assume.assumeTrue(TestUtil.isNodeStressTests());
         testNodes(1000 * 1000 * 5);
     }
 
-    @Ignore
     @Test
     public void test10M() throws Exception {
+        // use Assume instead of @Ignore. If the "nodeStressTests" profile is not activated, Assume
+        // will skip this test. The "stressTests" profile will also activate nodeStressTests.
+        Assume.assumeTrue(TestUtil.isNodeStressTests());
         testNodes(1000 * 1000 * 10);
     }
 
-    @Ignore
     @Test
     public void test25M() throws Exception {
+        // use Assume instead of @Ignore. If the "nodeStressTests" profile is not activated, Assume
+        // will skip this test. The "stressTests" profile will also activate nodeStressTests.
+        Assume.assumeTrue(TestUtil.isNodeStressTests());
         testNodes(1000 * 1000 * 25);
     }
 
-    @Ignore
     @Test
     public void test50M() throws Exception {
+        // use Assume instead of @Ignore. If the "nodeStressTests" profile is not activated, Assume
+        // will skip this test. The "stressTests" profile will also activate nodeStressTests.
+        Assume.assumeTrue(TestUtil.isNodeStressTests());
         testNodes(1000 * 1000 * 50);
     }
 
