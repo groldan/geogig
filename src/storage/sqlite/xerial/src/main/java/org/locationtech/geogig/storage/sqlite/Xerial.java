@@ -1,4 +1,4 @@
-/* Copyright (c) 2014 Boundless and others.
+/* Copyright (c) 2014-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -19,6 +19,7 @@ import org.locationtech.geogig.api.Context;
 import org.locationtech.geogig.di.GeogigModule;
 import org.slf4j.Logger;
 import org.sqlite.SQLiteConfig.SynchronousMode;
+import org.sqlite.SQLiteConfig.LockingMode;
 import org.sqlite.SQLiteDataSource;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -96,7 +97,7 @@ public class Xerial {
         dataSource.setSharedCache(true);
         dataSource.setReadUncommited(true);
         //dataSource.setCacheSize(10_000);
-        dataSource.setLockingMode("NORMAL");
+        dataSource.setLockingMode(LockingMode.NORMAL.getValue());
         return dataSource;
     }
 

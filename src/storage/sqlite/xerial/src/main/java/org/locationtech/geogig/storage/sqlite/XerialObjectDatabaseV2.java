@@ -1,4 +1,4 @@
-/* Copyright (c) 2015 Boundless and others.
+/* Copyright (c) 2015-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -45,6 +45,7 @@ import org.sqlite.SQLiteDataSource;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
+import com.google.common.collect.UnmodifiableIterator;
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
 import com.google.inject.Inject;
@@ -352,10 +353,13 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
         checkWritable();
 
         // System.err.println("put allllllll");
-        txHandler.startTransaction();
-        while (objects.hasNext()) {
+        //txHandler.startTransaction();
+        UnmodifiableIterator<List<RevObject>> revObjectLists =
+            Iterators.partition((Iterator<RevObject>)objects, partitionSize);
 
-            final Iterator<? extends RevObject> objs = Iterators.limit(objects, partitionSize);
+        while (revObjectLists.hasNext()) {
+
+            final List<RevObject> revObjectList = revObjectLists.next();
 
             runTx(new SQLiteTransactionHandler.WriteOp<Void>() {
 
@@ -375,8 +379,7 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
                     final String sql = INSERT_SQL;
                     List<ObjectId> ids = new LinkedList<>();
                     try (PreparedStatement ps = cx.prepareStatement(sql)) {
-                        while (objs.hasNext()) {
-                            RevObject obj = objs.next();
+                        for (RevObject obj : revObjectList) {
                             ObjectId id = obj.getId();
                             ids.add(id);
 
@@ -403,7 +406,7 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
                 }
             });
         }
-        txHandler.endTransaction();
+        //txHandler.endTransaction();
     }
 
     void notifyInserted(int[] inserted, List<ObjectId> objects, BulkOpListener listener) {
@@ -425,11 +428,14 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
         Preconditions.checkNotNull(listener, "argument listener is null");
         checkWritable();
 
-        txHandler.startTransaction();
+        //txHandler.startTransaction();
         long totalCount = 0;
-        while (ids.hasNext()) {
+        UnmodifiableIterator<List<ObjectId>> objectIdLists
+            = Iterators.partition(ids, partitionSize);
 
-            final Iterator<ObjectId> deleteIds = Iterators.limit(ids, partitionSize);
+        while (objectIdLists.hasNext()) {
+
+            final List<ObjectId> objectIds = objectIdLists.next();
 
             totalCount += runTx(new SQLiteTransactionHandler.WriteOp<Long>() {
 
@@ -440,17 +446,14 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
                     final String sql = DELETE_SQL;
                     try (PreparedStatement stmt = cx.prepareStatement(sql)) {
 
-                        // partition the objects into chunks for batch processing
-                        List<ObjectId> ids = Lists.newArrayList(deleteIds);
-
-                        for (ObjectId id : ids) {
+                        for (ObjectId id : objectIds) {
                             final ID dbId = ID.valueOf(id);
                             stmt.setInt(1, dbId.hash1());
                             stmt.setLong(2, dbId.hash2());
                             stmt.setLong(3, dbId.hash3());
                             stmt.addBatch();
                         }
-                        count += notifyDeleted(stmt.executeBatch(), ids, listener);
+                        count += notifyDeleted(stmt.executeBatch(), objectIds, listener);
                         stmt.clearParameters();
                     }
                     return count;
@@ -458,7 +461,7 @@ public class XerialObjectDatabaseV2 extends SQLiteObjectDatabase<DataSource> {
             }).longValue();
 
         }
-        txHandler.endTransaction();
+        //txHandler.endTransaction();
 
         return totalCount;
     }

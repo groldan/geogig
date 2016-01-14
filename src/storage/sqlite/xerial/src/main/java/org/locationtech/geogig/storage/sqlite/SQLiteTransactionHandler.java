@@ -1,4 +1,4 @@
-/* Copyright (c) 2015 Boundless and others.
+/* Copyright (c) 2015-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -9,7 +9,6 @@
  */
 package org.locationtech.geogig.storage.sqlite;
 
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.concurrent.Callable;
@@ -28,7 +27,7 @@ class SQLiteTransactionHandler {
 
     public static abstract class WriteOp<T> extends DbOp<T> {
 
-        protected abstract T doRun(Connection cx) throws IOException, SQLException;
+        // just a marker interface
 
     }
 
@@ -74,7 +73,7 @@ class SQLiteTransactionHandler {
         }
     }
 
-    public synchronized void startTransaction() {
+    private synchronized void startTransaction() {
         int depth = transactionDepth.incrementAndGet();
         if (depth == 1) {
             try {
@@ -95,7 +94,7 @@ class SQLiteTransactionHandler {
         }
     }
 
-    public synchronized void endTransaction() {
+    private synchronized void endTransaction() {
         int depth = transactionDepth.decrementAndGet();
         if (depth == 0) {
             try {

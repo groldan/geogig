@@ -1,4 +1,4 @@
-/* Copyright (c) 2014 Boundless and others.
+/* Copyright (c) 2014-2016 Boundless and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
@@ -9,7 +9,6 @@
  */
 package org.locationtech.geogig.storage.sqlite;
 
-import static java.lang.String.format;
 import static org.locationtech.geogig.storage.sqlite.Xerial.log;
 
 import java.io.File;
@@ -34,6 +33,7 @@ import org.sqlite.SQLiteDataSource;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import static java.lang.String.format;
 
 /**
  * Graph database based on xerial SQLite jdbc driver.
@@ -52,13 +52,17 @@ abstract class XerialGraphDatabase extends SQLiteGraphDatabase<DataSource> {
 
     static final String MAPPINGS = "mappings";
 
+    static final String DBNAME = "graph.db";
+
+    private SQLiteTransactionHandler txHandler;
+
     public XerialGraphDatabase(ConfigDatabase configdb, Platform platform, VersionedFormat version) {
         super(configdb, platform, version);
     }
 
     @Override
     protected DataSource connect(File geogigDir) {
-        SQLiteDataSource dataSource = Xerial.newDataSource(new File(geogigDir, "graph.db"));
+        SQLiteDataSource dataSource = Xerial.newDataSource(new File(geogigDir, DBNAME));
 
         HikariConfig poolConfig = new HikariConfig();
         poolConfig.setMaximumPoolSize(10);
@@ -67,20 +71,44 @@ abstract class XerialGraphDatabase extends SQLiteGraphDatabase<DataSource> {
         poolConfig.setIdleTimeout(TimeUnit.SECONDS.toMillis(10));
 
         HikariDataSource connPool = new HikariDataSource(poolConfig);
+        this.txHandler = new SQLiteTransactionHandler(connPool);
         return connPool;
     }
 
     @Override
     protected void close(DataSource ds) {
+        if (this.txHandler != null) {
+            this.txHandler.close();
+            this.txHandler = null;
+        }
+
         ((HikariDataSource) ds).close();
     }
 
     @Override
+    protected void finalize() throws Throwable {
+        try {
+            if (this.txHandler != null) {
+                System.err.println("----------------------------------------------");
+                System.err.println("---------------- WARNING ---------------------");
+                System.err.printf("---- DATABASE '%s/%s' has not been closed ------\n",
+                        super.platform.pwd(), DBNAME);
+                // for (StackTraceElement e : openingCallers) {
+                // System.err.println(e.toString());
+                // }
+                System.err.println("----------------------------------------------");
+                close();
+            }
+        } finally {
+            super.finalize();
+        }
+    }
+
+    @Override
     public void init(DataSource ds) {
-        new DbOp<Void>() {
+        runTx(new SQLiteTransactionHandler.WriteOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws IOException, SQLException {
-                cx.setAutoCommit(false);
                 try (Statement st = cx.createStatement()) {
 
                     String sql = format("CREATE TABLE IF NOT EXISTS %s (id VARCHAR PRIMARY KEY)",
@@ -110,40 +138,34 @@ abstract class XerialGraphDatabase extends SQLiteGraphDatabase<DataSource> {
                     sql = format("CREATE INDEX IF NOT EXISTS %s_nid_index ON %s(nid)", MAPPINGS,
                             MAPPINGS);
                     st.execute(log(sql, LOG));
-                    cx.commit();
-                } catch (SQLException e) {
-                    cx.rollback();
-                    throw e;
                 }
                 return null;
             }
-        }.run(ds);
+        });
 
+    }
+
+    private <T> T runTx(final SQLiteTransactionHandler.WriteOp<T> dbop) {
+        return txHandler.runTx(dbop);
     }
 
     @Override
     public boolean put(final String node, DataSource ds) {
-        if (has(node, ds)) {
-            return false;
-        }
 
-        return new DbOp<Boolean>() {
+        return runTx(new SQLiteTransactionHandler.WriteOp<Boolean>() {
             @Override
             protected Boolean doRun(Connection cx) throws IOException, SQLException {
                 String sql = format("INSERT OR IGNORE INTO %s (id) VALUES (?)", NODES);
 
-                cx.setAutoCommit(false);
+                //cx.setAutoCommit(false);
                 try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, node))) {
                     ps.setString(1, node);
-                    ps.executeUpdate();
-                    cx.commit();
-                } catch (SQLException e) {
-                    cx.rollback();
-                    throw e;
+                    int updateCount = ps.executeUpdate();
+                    //cx.commit();
+                    return Boolean.valueOf(updateCount > 0);
                 }
-                return true;
             }
-        }.run(ds);
+        });
     }
 
     @Override
@@ -168,48 +190,38 @@ abstract class XerialGraphDatabase extends SQLiteGraphDatabase<DataSource> {
 
     @Override
     public void relate(final String src, final String dst, DataSource ds) {
-        new DbOp<Void>() {
+        runTx(new SQLiteTransactionHandler.WriteOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws IOException, SQLException {
                 String sql = format("INSERT or IGNORE INTO %s (src, dst) VALUES (?, ?)", EDGES);
 
-                cx.setAutoCommit(false);
                 try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, src, dst))) {
                     ps.setString(1, src);
                     ps.setString(2, dst);
 
                     ps.executeUpdate();
-                    cx.commit();
-                } catch (SQLException e) {
-                    cx.rollback();
-                    throw e;
                 }
                 return null;
             }
-        }.run(ds);
+        });
     }
 
     @Override
     public void map(final String from, final String to, DataSource ds) {
-        new DbOp<Void>() {
+        runTx(new SQLiteTransactionHandler.WriteOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws IOException, SQLException {
                 String sql = format("INSERT OR REPLACE INTO %s (alias, nid) VALUES (?,?)", MAPPINGS);
 
-                cx.setAutoCommit(false);
                 try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, from))) {
                     ps.setString(1, from);
                     ps.setString(2, to);
 
                     ps.executeUpdate();
-                    cx.commit();
-                } catch (SQLException e) {
-                    cx.rollback();
-                    throw e;
                 }
                 return null;
             }
-        }.run(ds);
+        });
     }
 
     @Override
@@ -235,26 +247,21 @@ abstract class XerialGraphDatabase extends SQLiteGraphDatabase<DataSource> {
 
     @Override
     public void property(final String node, final String key, final String val, DataSource ds) {
-        new DbOp<Void>() {
+        runTx(new SQLiteTransactionHandler.WriteOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws IOException, SQLException {
                 String sql = format("INSERT OR REPLACE INTO %s (nid,key,val) VALUES (?,?,?)", PROPS);
 
-                cx.setAutoCommit(false);
                 try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, node, key, val))) {
                     ps.setString(1, node);
                     ps.setString(2, key);
                     ps.setString(3, val);
 
                     ps.executeUpdate();
-                    cx.commit();
-                } catch (SQLException e) {
-                    cx.rollback();
-                    throw e;
                 }
                 return null;
             }
-        }.run(ds);
+        });
     }
 
     @Override
@@ -330,10 +337,9 @@ abstract class XerialGraphDatabase extends SQLiteGraphDatabase<DataSource> {
 
     @Override
     public void clear(DataSource ds) {
-        new DbOp<Void>() {
+        runTx(new SQLiteTransactionHandler.WriteOp<Void>() {
             @Override
             protected Void doRun(Connection cx) throws IOException, SQLException {
-                cx.setAutoCommit(false);
                 try (Statement st = cx.createStatement()) {
 
                     String sql = format("DELETE FROM %s", PROPS);
@@ -347,13 +353,9 @@ abstract class XerialGraphDatabase extends SQLiteGraphDatabase<DataSource> {
 
                     sql = format("DELETE FROM %s", MAPPINGS);
                     st.execute(log(sql, LOG));
-                    cx.commit();
-                } catch (SQLException e) {
-                    cx.rollback();
-                    throw e;
                 }
                 return null;
             }
-        }.run(ds);
+        });
     }
 }
