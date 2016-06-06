@@ -11,6 +11,7 @@ package org.locationtech.geogig.storage;
 
 import java.io.Closeable;
 import java.util.Iterator;
+import java.util.Objects;
 
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.repository.RepositoryConnectionException;
@@ -79,6 +80,21 @@ public interface GraphDatabase extends Closeable {
         @Override
         public String toString() {
             return "" + from + ":" + to;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof GraphEdge)) {
+                return false;
+            }
+            GraphEdge e = (GraphEdge) o;
+            return Objects.equals(getFromNode(), e.getFromNode())
+                    && Objects.equals(getToNode(), e.getToNode());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(getFromNode(), getToNode());
         }
     }
 
