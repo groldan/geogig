@@ -160,7 +160,6 @@ public class CreateQuadTree extends AbstractGeoGigOp<Index> {
             checkArgument(null != descriptor, "FeatureType %s does not define attribute '%s'",
                     typeName, attname);
         }
-        System.err.println("Extra attributes: " + Arrays.toString(atts));
         return atts;
     }
 
