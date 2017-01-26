@@ -33,6 +33,7 @@ import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.crs.DefaultEngineeringCRS;
 import org.geotools.renderer.ScreenMap;
 import org.locationtech.geogig.data.FeatureBuilder;
+import org.locationtech.geogig.data.retrieve.BulkFeatureRetriever;
 import org.locationtech.geogig.geotools.data.GeoGigDataStore.ChangeType;
 import org.locationtech.geogig.model.Bounded;
 import org.locationtech.geogig.model.Bucket;
@@ -232,13 +233,16 @@ class GeogigFeatureReader<T extends FeatureType, F extends Feature>
             featureRefs = applyRefsOffsetLimit(featureRefs);
         }
 
-        final Function<List<NodeRef>, Iterator<SimpleFeature>> function;
-        function = new FetchFunction(objectStore, schema, geomFac);
-        final int fetchSize = 1000;
-        Iterator<List<NodeRef>> partition = Iterators.partition(featureRefs, fetchSize);
-        Iterator<Iterator<SimpleFeature>> transformed = Iterators.transform(partition, function);
+        BulkFeatureRetriever retriever = new BulkFeatureRetriever(context.objectDatabase());
+        final Iterator<SimpleFeature> featuresUnfiltered = retriever
+                .getGeoToolsFeatures(featureRefs, schema);
+        // final Function<List<NodeRef>, Iterator<SimpleFeature>> function;
+        // function = new FetchFunction(objectStore, schema, geomFac);
+        // final int fetchSize = 1000;
+        // Iterator<List<NodeRef>> partition = Iterators.partition(featureRefs, fetchSize);
+        // Iterator<Iterator<SimpleFeature>> transformed = Iterators.transform(partition, function);
 
-        final Iterator<SimpleFeature> featuresUnfiltered = Iterators.concat(transformed);
+        // final Iterator<SimpleFeature> featuresUnfiltered = Iterators.concat(transformed);
 
         // Iterator<SimpleFeature> featuresUnfiltered = Iterators.transform(featureRefs,
         // new CachedNodeToFeature(schema));
