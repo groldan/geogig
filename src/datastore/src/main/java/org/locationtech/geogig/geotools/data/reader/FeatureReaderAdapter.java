@@ -17,6 +17,9 @@ import org.locationtech.geogig.repository.AutoCloseableIterator;
 import org.opengis.feature.Feature;
 import org.opengis.feature.type.FeatureType;
 
+/**
+ * Adapts a closeable iterator of features as a {@link FeatureReader}
+ */
 class FeatureReaderAdapter<T extends FeatureType, F extends Feature>
         implements FeatureReader<T, F> {
 
