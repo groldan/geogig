@@ -26,6 +26,7 @@ import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.filter.visitor.SimplifyingFilterVisitor;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.renderer.ScreenMap;
+import org.locationtech.geogig.di.ReadOnlyContext;
 import org.locationtech.geogig.geotools.data.GeoGigDataStore.ChangeType;
 import org.locationtech.geogig.geotools.data.reader.FeatureReaderBuilder;
 import org.locationtech.geogig.model.ObjectId;
@@ -58,13 +59,15 @@ class GeogigFeatureSource extends ContentFeatureSource {
 
     private String oldRoot;
 
+    private boolean readOnly;
+
     /**
      * <b>Precondition</b>: {@code entry.getDataStore() instanceof GeoGigDataStore}
      * 
      * @param entry
      */
     public GeogigFeatureSource(ContentEntry entry) {
-        this(entry, (Query) null);
+        this(entry, (Query) null, true);
     }
 
     /**
@@ -73,8 +76,9 @@ class GeogigFeatureSource extends ContentFeatureSource {
      * @param entry
      * @param query optional "definition query" making this feature source a "view"
      */
-    public GeogigFeatureSource(ContentEntry entry, @Nullable Query query) {
+    public GeogigFeatureSource(ContentEntry entry, @Nullable Query query, boolean readOnly) {
         super(entry, query);
+        this.readOnly = readOnly;
         Preconditions.checkArgument(entry.getDataStore() instanceof GeoGigDataStore);
     }
 
@@ -331,9 +335,27 @@ class GeogigFeatureSource extends ContentFeatureSource {
         return featureType;
     }
 
+    private Context context;
+
+    @Override
+    public void setTransaction(Transaction transaction) {
+        super.setTransaction(transaction);
+        this.context = null;
+    }
+
     Context getCommandLocator() {
-        Context commandLocator = getDataStore().getCommandLocator(getTransaction());
-        return commandLocator;
+        if (readOnly) {
+            if (this.context == null) {
+                Context context = getDataStore().getCommandLocator(getTransaction());
+                if (readOnly) {
+                    context = new ReadOnlyContext(context);
+                }
+                this.context = context;
+            }
+            return context;
+        } else {
+            return getDataStore().getCommandLocator(getTransaction());
+        }
     }
 
     SimpleFeatureType getNativeType() {

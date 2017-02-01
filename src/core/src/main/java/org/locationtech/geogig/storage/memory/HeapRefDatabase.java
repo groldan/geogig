@@ -33,6 +33,10 @@ public class HeapRefDatabase extends AbstractRefDatabase {
 
     private ConcurrentMap<String, String> refs;
 
+    public void putAll(Map<String, String> refs) {
+        this.refs.putAll(refs);
+    }
+
     /**
      * Creates the reference database.
      */

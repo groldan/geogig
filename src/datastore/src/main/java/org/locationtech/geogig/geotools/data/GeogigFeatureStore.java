@@ -77,7 +77,7 @@ class GeogigFeatureStore extends ContentFeatureStore {
      */
     public GeogigFeatureStore(ContentEntry entry) {
         super(entry, (Query) null);
-        delegate = new GeogigFeatureSource(entry, query) {
+        delegate = new GeogigFeatureSource(entry, query, false) {
             @Override
             public void setTransaction(Transaction transaction) {
                 super.setTransaction(transaction);
