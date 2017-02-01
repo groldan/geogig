@@ -30,6 +30,7 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -74,17 +75,13 @@ public class PreOrderDiffWalk {
 
     public static final CanonicalNodeOrder ORDER = CanonicalNodeOrder.INSTANCE;
 
-    private static final ForkJoinPool FORK_JOIN_POOL;
+     static ForkJoinPool.ForkJoinWorkerThreadFactory threadFactory= pool -> {
+        final ForkJoinWorkerThread worker = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
+        worker.setName("PreOrderDiffWalk-" + worker.getPoolIndex());
+        return worker;
+    };
 
-    static {
-        final int parallelism = Math.max(2, Runtime.getRuntime().availableProcessors());
-        // establishes local first-in-first-out scheduling mode for forked
-        // more appropriate than default locally stack-based mode when
-        // worker threads only process event-style asynchronous tasks
-        final boolean asyncMode = true;
-        FORK_JOIN_POOL = new ForkJoinPool(parallelism,
-                ForkJoinPool.defaultForkJoinWorkerThreadFactory, null, asyncMode);
-    }
+
 
     /**
      * Contains the full path to the bucket as an array of integers where the array length
@@ -202,9 +199,11 @@ public class PreOrderDiffWalk {
         this.leftSource = leftSource;
         this.rightSource = rightSource;
         if (preserveIterationOrder) {
-            forkJoinPool = new ForkJoinPool(1);
+            forkJoinPool = new ForkJoinPool(1, threadFactory, null, false);
         } else {
-            forkJoinPool = FORK_JOIN_POOL;
+            final int parallelism = Math.max(2, Runtime.getRuntime().availableProcessors());
+            final boolean asyncMode = true;
+            forkJoinPool = new ForkJoinPool(parallelism,threadFactory, null, asyncMode);
         }
     }
 
@@ -312,6 +311,7 @@ public class PreOrderDiffWalk {
             }
         } finally {
             finished.set(true);
+            forkJoinPool.shutdown();
         }
     }
 
