@@ -383,6 +383,7 @@ public class FeatureReaderBuilder {
                     msg += ", stats: " + s;
                 }
                 System.err.println(msg);
+                features.close();
             }
         };
     }
