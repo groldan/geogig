@@ -21,6 +21,7 @@ import java.util.List;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.locationtech.geogig.model.Node;
 import org.locationtech.geogig.model.RevTree;
@@ -274,6 +275,7 @@ public class QuadTreeClusteringStrategy_putTest {
         return quadStrategy;
     }
 
+    @Ignore
     @Test
     public void testCollapsedTreeUpdatesAsExpected() {
 

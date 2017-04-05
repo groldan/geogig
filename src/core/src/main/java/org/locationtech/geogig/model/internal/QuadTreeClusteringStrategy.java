@@ -64,7 +64,7 @@ class QuadTreeClusteringStrategy extends ClusteringStrategy {
             Envelope maxBounds) {
         super(original, storageProvider);
         this.maxBounds = maxBounds;
-        init(original);
+//        init(original);
     }
 
     /**
@@ -102,13 +102,13 @@ class QuadTreeClusteringStrategy extends ClusteringStrategy {
      */
     @Override
     public DAG buildRoot() {
-        while (1 == root.numBuckets()) {
-            root.forEachBucket((treeId) -> {
-                DAG actual = getOrCreateDAG(treeId);
-                root = actual;
-            });
-        }
-
+//        while (1 == root.numBuckets()) {
+//            root.forEachBucket((treeId) -> {
+//                DAG actual = getOrCreateDAG(treeId);
+//                root = actual;
+//            });
+//        }
+//
         return root;
     }
 
