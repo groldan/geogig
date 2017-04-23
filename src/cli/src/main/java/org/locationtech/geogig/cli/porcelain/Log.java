@@ -10,11 +10,14 @@
 package org.locationtech.geogig.cli.porcelain;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.fusesource.jansi.Ansi;
 import org.fusesource.jansi.Ansi.Color;
@@ -28,6 +31,8 @@ import org.locationtech.geogig.cli.annotation.ReadOnly;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.Ref;
 import org.locationtech.geogig.model.RevCommit;
+import org.locationtech.geogig.model.RevObject;
+import org.locationtech.geogig.model.RevObjects;
 import org.locationtech.geogig.model.RevPerson;
 import org.locationtech.geogig.model.SymRef;
 import org.locationtech.geogig.plumbing.DiffCount;
@@ -218,7 +223,9 @@ public class Log extends AbstractCommand implements CLICommand {
         }
 
         LogEntryPrinter printer;
-        if (args.oneline) {
+        if (args.graphml) {
+            printer = new GraphMLConverter(System.out);
+        } else if (args.oneline) {
             printer = new OneLineConverter();
         } else {
             LOG_DETAIL detail;
@@ -237,7 +244,12 @@ public class Log extends AbstractCommand implements CLICommand {
 
         while (log.hasNext()) {
             printer.print(log.next());
-            console.flush();
+            if (!args.graphml) {
+                console.flush();
+            }
+        }
+        if (args.graphml) {
+            ((GraphMLConverter) printer).end();
         }
     }
 
@@ -265,6 +277,47 @@ public class Log extends AbstractCommand implements CLICommand {
             console.println(ansi.toString());
         }
 
+    }
+
+    private class GraphMLConverter implements LogEntryPrinter {
+
+        private GraphMLPrinter printer;
+
+        private Set<String> visited = new HashSet<>();
+
+        private GraphMLConverter(OutputStream out) {
+            printer = new GraphMLPrinter(out);
+            printer.start();
+        }
+
+        public void end() {
+            printer.end();
+        }
+
+        @Override
+        public void print(RevCommit commit) throws IOException {
+            String id = id(commit);
+            if (!visited.add(id)) {
+                return;
+            }
+            printer.startNode(id).startData().shapeEllipse().label(id).endData().endNode();
+
+            for (ObjectId parent : commit.getParentIds()) {
+                printer.edge(id(parent), id);
+            }
+        }
+
+        StringBuilder idtarget = new StringBuilder();
+
+        private String id(RevObject o) {
+            return id(o.getId());
+        }
+
+        private String id(ObjectId id) {
+            idtarget.setLength(0);
+            RevObjects.toString(id, 4, idtarget);
+            return idtarget.toString();
+        }
     }
 
     private class StandardConverter implements LogEntryPrinter {

@@ -21,8 +21,10 @@ import org.junit.rules.ExpectedException;
 import org.locationtech.geogig.model.Bucket;
 import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.ObjectId;
+import org.locationtech.geogig.model.Ref;
 import org.locationtech.geogig.model.RevCommit;
 import org.locationtech.geogig.model.RevFeatureType;
+import org.locationtech.geogig.model.RevTag;
 import org.locationtech.geogig.plumbing.diff.PreOrderDiffWalk.BucketIndex;
 import org.locationtech.geogig.test.integration.RepositoryTestCase;
 
@@ -75,6 +77,36 @@ public class WalkGraphOpTest extends RepositoryTestCase {
         public void bucket(BucketIndex bucketIndex, Bucket bucket) {
             events.add(bucket);
             sevents.add("END BUCKET");
+        }
+
+        @Override
+        public void ref(Ref ref) {
+            events.add(ref);
+            sevents.add(ref.toString());            
+        }
+
+        @Override
+        public void endCommit(RevCommit commit) {
+            // TODO Auto-generated method stub
+            
+        }
+
+        @Override
+        public void endRef(Ref ref) {
+            // TODO Auto-generated method stub
+            
+        }
+
+        @Override
+        public void startTag(RevTag tag) {
+            // TODO Auto-generated method stub
+            
+        }
+
+        @Override
+        public void endTag(RevTag tag) {
+            // TODO Auto-generated method stub
+            
         }
     };
 

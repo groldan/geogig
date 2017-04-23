@@ -94,4 +94,6 @@ public class LogArgs {
     @Nullable
     public boolean utcDateFormat;
 
+    @Parameter(names = "--graphml", description = "Print as a GraphML document")
+    public boolean graphml;
 }
