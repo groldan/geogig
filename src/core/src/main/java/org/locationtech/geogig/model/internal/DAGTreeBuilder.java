@@ -172,12 +172,18 @@ public class DAGTreeBuilder {
         return build(clusteringStrategy, targetStore, () -> false);
     }
 
+    static boolean header = false;
+
     public static @Nullable RevTree build(final ClusteringStrategy clusteringStrategy,
             final ObjectStore targetStore, final BooleanSupplier abortFlag) {
         checkNotNull(clusteringStrategy);
         checkNotNull(targetStore);
         checkNotNull(abortFlag);
-
+        if (!header) {
+            System.err.printf(
+                    "STATUS\tID\tSIZE\tNODES\tBUCKETS\tORIG\tORIG SIZE\tORIG NODES\tORIG BUCKETS\n");
+            header = true;
+        }
         SharedState state = new SharedState(targetStore, clusteringStrategy, abortFlag);
 
         final DAG root = clusteringStrategy.buildRoot();
@@ -317,6 +323,23 @@ public class DAGTreeBuilder {
 
             RevTree result = RevTreeBuilder.build(size, childTreeCount, treeNodes, featureNodes,
                     buckets);
+
+            if (!RevTree.EMPTY_TREE_ID.equals(root.originalTreeId())) {
+                RevTree orig = state.getTree(root.originalTreeId());
+
+                System.err.printf("%s\t%s\t%,d\t%,d\t%,d\t%s\t%,d\t%,d\t%,d\n", //
+                        root.getState(), //
+                        result.getId(), //
+                        result.size(), //
+                        result.features().size() + result.trees().size(), //
+                        result.buckets().size(), //
+                        orig.getId(), //
+                        orig.size(), //
+                        orig.features().size() + orig.trees().size(), //
+                        orig.buckets().size()//
+                );
+            }
+
             return state.isCancelled() ? null : result;
         }
 
@@ -351,6 +374,20 @@ public class DAGTreeBuilder {
             RevTree tree = RevTreeBuilder.build(size, childTreeCount, treesList, featuresList,
                     buckets);
 
+            if (!RevTree.EMPTY_TREE_ID.equals(root.originalTreeId())) {
+                RevTree orig = state.getTree(root.originalTreeId());
+                System.err.printf("%s\t%s\t%,d\t%,d\t%,d\t%s\t%,d\t%,d\t%,d\n", //
+                        root.getState(), //
+                        tree.getId(), //
+                        tree.size(), //
+                        tree.features().size() + tree.trees().size(), //
+                        0, //
+                        orig.getId(), //
+                        orig.size(), //
+                        orig.features().size() + orig.trees().size(), //
+                        0//
+                );
+            }
             return tree;
 
         }
