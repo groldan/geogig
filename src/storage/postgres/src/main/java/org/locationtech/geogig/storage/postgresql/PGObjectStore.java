@@ -23,6 +23,8 @@ import static org.locationtech.geogig.storage.postgresql.Environment.KEY_THREADP
 import static org.locationtech.geogig.storage.postgresql.PGStorage.log;
 import static org.locationtech.geogig.storage.postgresql.PGStorage.rollbackAndRethrow;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.net.URISyntaxException;
 import java.sql.Array;
 import java.sql.Connection;
@@ -73,7 +75,9 @@ import org.locationtech.geogig.storage.BulkOpListener;
 import org.locationtech.geogig.storage.ConfigDatabase;
 import org.locationtech.geogig.storage.ObjectInfo;
 import org.locationtech.geogig.storage.ObjectStore;
-import org.locationtech.geogig.storage.datastream.SerializationFactoryProxy;
+import org.locationtech.geogig.storage.datastream.LZFSerializationFactory;
+import org.locationtech.geogig.storage.datastream.v2_4.DataStreamSerializationFactoryV2_4;
+import org.locationtech.geogig.storage.impl.ObjectSerializingFactory;
 import org.locationtech.geogig.storage.postgresql.Environment.ConnectionConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,7 +116,7 @@ public class PGObjectStore implements ObjectStore {
 
     protected final ConfigDatabase configdb;
 
-    private static final SerializationFactoryProxy encoder = new SerializationFactoryProxy();
+    protected ObjectSerializingFactory encoder;
 
     protected DataSource dataSource;
 
@@ -142,6 +146,12 @@ public class PGObjectStore implements ObjectStore {
                 config.getRepositoryName());
         this.configdb = configdb;
         this.config = config;
+
+        DataStreamSerializationFactoryV2_4 serializer = new DataStreamSerializationFactoryV2_4(
+                this);
+        LZFSerializationFactory compressingSerializer = new LZFSerializationFactory(serializer);
+        encoder = compressingSerializer;
+        // encoder = new SerializationFactoryProxy();
     }
 
     @Override
@@ -686,7 +696,7 @@ public class PGObjectStore implements ObjectStore {
             cx.setAutoCommit(true);
             try (PreparedStatement ps = cx.prepareStatement(log(sql, LOG, id, object))) {
                 pgid.setArgs(ps, 1);
-                byte[] blob = encoder.encode(object);
+                byte[] blob = serialize(object);
                 ps.setBytes(4, blob);
 
                 final int updateCount = ps.executeUpdate();
@@ -810,7 +820,12 @@ public class PGObjectStore implements ObjectStore {
             return null;
         }
 
-        RevObject obj = encoder.read(id, bytes, 0, bytes.length);
+        RevObject obj;
+        try {
+            obj = encoder.read(id, bytes, 0, bytes.length);
+        } catch (IOException e) {
+            throw Throwables.propagate(e);
+        }
         sharedCache.put(obj);
         return obj;
     }
@@ -853,7 +868,7 @@ public class PGObjectStore implements ObjectStore {
         return future;
     }
 
-    private static class GetAllOp<T extends RevObject> implements Callable<List<T>> {
+    private class GetAllOp<T extends RevObject> implements Callable<List<T>> {
 
         private final Set<ObjectId> queryIds;
 
@@ -918,7 +933,7 @@ public class PGObjectStore implements ObjectStore {
                                     byte[] bytesBase64 = rs.getBytes(4);
                                     bytes = base64Decoder.decode(bytesBase64);
 
-                                    RevObject obj = encoder.decode(id, bytes);
+                                    RevObject obj = encoder.read(id, bytes, 0, bytes.length);
                                     if (objType == null || objType.equals(obj.getType())) {
                                         if (notify) {
                                             queryIds.remove(id);
@@ -961,7 +976,7 @@ public class PGObjectStore implements ObjectStore {
         }
     }
 
-    private static class GetObjectOp<T extends RevObject> implements Callable<List<ObjectInfo<T>>> {
+    private class GetObjectOp<T extends RevObject> implements Callable<List<ObjectInfo<T>>> {
 
         private final Set<NodeRef> queryNodes;
 
@@ -1023,7 +1038,7 @@ public class PGObjectStore implements ObjectStore {
                 if (bytes == null) {
                     callback.notFound(n.getObjectId());
                 } else {
-                    RevObject obj = encoder.decode(id, bytes);
+                    RevObject obj = encoder.read(id, bytes, 0, bytes.length);
                     if (objType == null || objType.equals(obj.getType())) {
                         callback.found(id, null/* this arg should be deprecated */);
                         ObjectInfo<T> info = ObjectInfo.of(n, type.cast(obj));
@@ -1193,8 +1208,18 @@ public class PGObjectStore implements ObjectStore {
     private EncodedObject encode(RevObject o) {
         ObjectId id = o.getId();
         TYPE type = o.getType();
-        byte[] serialized = encoder.encode(o);
+        byte[] serialized = serialize(o);
         return new EncodedObject(id, type, serialized);
+    }
+
+    private byte[] serialize(final RevObject o) {
+        try (ByteArrayOutputStream bout = new ByteArrayOutputStream()) {
+            encoder.write(o, bout);
+            byte[] bytes = bout.toByteArray();
+            return bytes;
+        } catch (Exception e) {
+            throw new RuntimeException("Error encoding object " + o, e);
+        }
     }
 
     /**

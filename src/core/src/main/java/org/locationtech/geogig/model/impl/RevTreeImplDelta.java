@@ -87,21 +87,28 @@ public class RevTreeImplDelta extends AbstractRevObject implements RevTree {
         ImmutableList<Node> deltaFeatures = delta(original.features(), features);
         ImmutableSortedMap<Integer, Bucket> deltaBuckets = delta(original.buckets(), buckets);
 
-        Preconditions.checkState(trees == null ? deltaTrees.isEmpty() : trees.equals(deltaTrees));
-        Preconditions.checkState(
-                features == null ? deltaFeatures.isEmpty() : features.equals(deltaFeatures));
-        try {
-            Preconditions.checkState(
-                    buckets == null ? deltaBuckets.isEmpty() : buckets.equals(deltaBuckets));
-        } catch (RuntimeException e) {
-            e.printStackTrace();
-            throw e;
-        }
         ObjectId id2 = HashObject.hashTree(deltaTrees, deltaFeatures, deltaBuckets);
         Preconditions.checkState(id.equals(id2));
         this.trees = deltaTrees;
         this.features = deltaFeatures;
         this.buckets = deltaBuckets;
+
+        deltaFeatures.forEach((n) -> {
+            if (n instanceof DeltaNode) {
+                ((DeltaNode) n).setTree(RevTreeImplDelta.this);
+            }
+        });
+        deltaTrees.forEach((n) -> {
+            if (n instanceof DeltaNode) {
+                ((DeltaNode) n).setTree(RevTreeImplDelta.this);
+            }
+        });
+
+        deltaBuckets.values().forEach((b) -> {
+            if (b instanceof DeltaBucket) {
+                ((DeltaBucket) b).setTree(RevTreeImplDelta.this);
+            }
+        });
     }
 
     private RevTree original() {

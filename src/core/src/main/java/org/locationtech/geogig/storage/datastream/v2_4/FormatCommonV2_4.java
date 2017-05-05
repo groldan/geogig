@@ -139,35 +139,36 @@ public class FormatCommonV2_4 extends FormatCommonV2_2 {
 
     @Override
     protected final Bucket readBucketBody(DataInput in) throws IOException {
-        int mode = in.readByte() & 0xFF;
+        int mode = in.readByte();
         if (mode == -1) {
             int index = Varint.readUnsignedVarInt(in);
             return new RevTreeImplDelta.DeltaBucket(Integer.valueOf(index));
-        } else {
-            return super.readBucketBody(in);
         }
+        Preconditions.checkState(mode == 1, "expected mode = 1, got %s", mode);
+        return super.readBucketBody(in);
     }
 
     @Override
     public Node readNode(DataInput in) throws IOException {
-        int mode = in.readByte() & 0xFF;
+        int mode = in.readByte();
         if (mode == -1) {
             TYPE type = TYPE.valueOf(in.readByte() & 0xFF);
             int index = Varint.readUnsignedVarInt(in);
             return new RevTreeImplDelta.DeltaNode(type, index);
         }
+        Preconditions.checkState(mode == 1, "expected mode = 1, got %s", mode);
         return super.readNode(in);
     }
 
     @Override
     public void writeNode(Node node, DataOutput data, Envelope env) throws IOException {
         if (node instanceof RevTreeImplDelta.DeltaNode) {
-            data.writeByte(-1);
+            data.write(-1);
             RevTreeImplDelta.DeltaNode dn = (DeltaNode) node;
             data.writeByte(dn.type.value());
             Varint.writeUnsignedVarInt(dn.index, data);
         } else {
-            data.writeByte(1);
+            data.write(1);
             super.writeNode(node, data, env);
         }
     }

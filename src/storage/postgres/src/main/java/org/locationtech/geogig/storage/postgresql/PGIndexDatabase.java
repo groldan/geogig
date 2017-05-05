@@ -41,6 +41,7 @@ import org.locationtech.geogig.storage.ConfigDatabase;
 import org.locationtech.geogig.storage.IndexDatabase;
 import org.locationtech.geogig.storage.StorageType;
 import org.locationtech.geogig.storage.datastream.DataStreamValueSerializerV2;
+import org.locationtech.geogig.storage.datastream.SerializationFactoryProxy;
 import org.locationtech.geogig.storage.datastream.ValueSerializer;
 
 import com.google.common.base.Optional;
@@ -74,6 +75,7 @@ public class PGIndexDatabase extends PGObjectStore implements IndexDatabase {
             final boolean readOnly) {
         super(configdb, config);
         this.readOnly = readOnly;
+        super.encoder = new SerializationFactoryProxy();
     }
 
     @Override
