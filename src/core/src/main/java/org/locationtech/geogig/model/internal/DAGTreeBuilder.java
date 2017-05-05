@@ -37,10 +37,12 @@ import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.RevObject.TYPE;
 import org.locationtech.geogig.model.RevTree;
 import org.locationtech.geogig.model.impl.RevTreeBuilder;
+import org.locationtech.geogig.model.impl.RevTreeImplDelta;
 import org.locationtech.geogig.model.internal.DAG.STATE;
 import org.locationtech.geogig.repository.impl.SpatialOps;
 import org.locationtech.geogig.storage.ObjectStore;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedMap;
@@ -371,6 +373,7 @@ public class DAGTreeBuilder {
             if (state.isCancelled()) {
                 return null;
             }
+
             RevTree tree = RevTreeBuilder.build(size, childTreeCount, treesList, featuresList,
                     buckets);
 
@@ -387,6 +390,15 @@ public class DAGTreeBuilder {
                         orig.features().size() + orig.trees().size(), //
                         0//
                 );
+
+                RevTree deltaTree = RevTreeImplDelta.build(orig, size, childTreeCount, treesList,
+                        featuresList, buckets);
+
+                Preconditions.checkState(tree.trees().equals(deltaTree.trees()));
+                Preconditions.checkState(tree.features().equals(deltaTree.features()));
+                Preconditions.checkState(tree.buckets().equals(deltaTree.buckets()));
+
+                tree = deltaTree;
             }
             return tree;
 

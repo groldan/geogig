@@ -71,7 +71,6 @@ import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.NoSuchAuthorityCodeException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
@@ -278,11 +277,17 @@ public class FormatCommonV2 {
         ImmutableList<Node> trees = treesBuilder.build();
         ImmutableList<Node> features = featuresBuilder.build();
 
+        RevTree tree = createTree(id, size, treeCount, trees, features, buckets);
+        return tree;
+    }
+
+    protected RevTree createTree(ObjectId id, long size, int treeCount, ImmutableList<Node> trees,
+            ImmutableList<Node> features, SortedMap<Integer, Bucket> buckets) {
+
         if (id == null) {
             id = HashObject.hashTree(trees, features, ImmutableSortedMap.copyOf(buckets));
         }
-        RevTree tree = RevTreeBuilder.create(id, size, treeCount, trees, features, buckets);
-        return tree;
+        return RevTreeBuilder.create(id, size, treeCount, trees, features, buckets);
     }
 
     public DiffEntry readDiff(DataInput in) throws IOException {
@@ -446,7 +451,7 @@ public class FormatCommonV2 {
     /**
      * Reads a bucket body (i.e assumes the head unsigned int "index" has been read already)
      */
-    protected  Bucket readBucketBody(DataInput in) throws IOException {
+    protected Bucket readBucketBody(DataInput in) throws IOException {
         ObjectId objectId = readObjectId(in);
         final int boundsMask = in.readByte() & 0xFF;
         @Nullable

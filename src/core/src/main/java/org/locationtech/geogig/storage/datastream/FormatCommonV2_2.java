@@ -46,7 +46,7 @@ public class FormatCommonV2_2  extends FormatCommonV2_1 {
 
 
     @Override
-    protected final Bucket readBucketBody(DataInput in) throws IOException {
+    protected Bucket readBucketBody(DataInput in) throws IOException {
         ObjectId objectId = readObjectId(in);
         @Nullable
         final Envelope bounds = readBounds(in);
@@ -133,7 +133,7 @@ public class FormatCommonV2_2  extends FormatCommonV2_1 {
      * @param data
      * @throws IOException
      */
-    private static void writeBounds(Envelope envelope, DataOutput data) throws IOException {
+    protected static void writeBounds(Envelope envelope, DataOutput data) throws IOException {
         //directly use the default encoding
         int[] serializedForm = Float32BoundsSerializer.serialize(envelope);
         writeSignedVarInt(serializedForm[0],data);
