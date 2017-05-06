@@ -191,7 +191,7 @@ public class PGCache {
 
     private RevObject decode(ObjectId id, byte[] val) {
         try {
-            return encoder.read(id, new ByteArrayInputStream(val));
+            return encoder.read(id, val, 0, val.length);
         } catch (IOException e) {
             throw Throwables.propagate(e);
         }

@@ -1,8 +1,10 @@
 package org.locationtech.geogig.model.impl;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.Map.Entry;
-import java.util.function.Supplier;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.Bucket;
@@ -10,16 +12,21 @@ import org.locationtech.geogig.model.Node;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.RevTree;
 import org.locationtech.geogig.plumbing.HashObject;
+import org.locationtech.geogig.storage.ObjectStore;
+import org.locationtech.geogig.storage.datastream.Delta;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableList.Builder;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Maps;
 import com.vividsolutions.jts.geom.Envelope;
 
-public class RevTreeImplDelta extends AbstractRevObject implements RevTree {
+public class RevTreeImplDelta extends AbstractRevObject implements RevTree, Delta {
 
     private final Supplier<RevTree> original;
 
@@ -33,18 +40,23 @@ public class RevTreeImplDelta extends AbstractRevObject implements RevTree {
 
     private final int numTrees;
 
-    public final ObjectId originalTreeId;
+    private final ObjectId originalTreeId;
 
-    public RevTreeImplDelta(Supplier<RevTree> original, //
+    private final int deltaLevel;
+
+    public RevTreeImplDelta(ObjectStore source, //
+            ObjectId originalTreeId, //
+            int deltaLevel, //
             ObjectId id, //
             long size, //
             int numtrees, //
-            @Nullable ImmutableList<Node> trees, //
-            @Nullable ImmutableList<Node> features, //
-            @Nullable ImmutableSortedMap<Integer, Bucket> buckets) {
+            ImmutableList<Node> trees, //
+            ImmutableList<Node> features, //
+            ImmutableSortedMap<Integer, Bucket> buckets) {
         super(id);
-        this.originalTreeId = original.get().getId();
-        this.original = original;
+        this.originalTreeId = originalTreeId;
+        this.deltaLevel = deltaLevel;
+        this.original = Suppliers.memoize(() -> source.getTree(this.originalTreeId));
         this.size = size;
         this.numTrees = numtrees;
         this.trees = trees;
@@ -69,8 +81,9 @@ public class RevTreeImplDelta extends AbstractRevObject implements RevTree {
         });
     }
 
-    public RevTreeImplDelta(RevTree original, //
-            ObjectId id, //
+    public RevTreeImplDelta(//
+            RevTree original, //
+            int deltaLevel, ObjectId id, //
             long size, //
             int numtrees, //
             @Nullable ImmutableList<Node> trees, //
@@ -79,6 +92,7 @@ public class RevTreeImplDelta extends AbstractRevObject implements RevTree {
 
         super(id);
         this.originalTreeId = original.getId();
+        this.deltaLevel = deltaLevel;
         this.original = () -> original;
         this.size = size;
         this.numTrees = numtrees;
@@ -109,6 +123,16 @@ public class RevTreeImplDelta extends AbstractRevObject implements RevTree {
                 ((DeltaBucket) b).setTree(RevTreeImplDelta.this);
             }
         });
+    }
+
+    @Override
+    public int getDeltaLevel() {
+        return deltaLevel;
+    }
+
+    @Override
+    public ObjectId getOriginalId() {
+        return originalTreeId;
     }
 
     private RevTree original() {
@@ -151,7 +175,57 @@ public class RevTreeImplDelta extends AbstractRevObject implements RevTree {
 
         ObjectId id = HashObject.hashTree(trees, features, buckets);
 
-        return new RevTreeImplDelta(original, id, size, childTreeCount, trees, features, buckets);
+        int deltaLevel = 1;
+        if (original instanceof Delta) {
+            deltaLevel = 1 + ((Delta) original).getDeltaLevel();
+        }
+        if (deltaLevel > 4) {
+            trees = resolveAll(original.trees(), trees);
+            features = resolveAll(original.features(), features);
+            buckets = resolveAll(original.buckets(), buckets);
+            return RevTreeBuilder.create(id, size, childTreeCount, trees, features, buckets);
+        }
+
+        return new RevTreeImplDelta(original, deltaLevel, id, size, childTreeCount, trees, features,
+                buckets);
+    }
+
+    private static ImmutableSortedMap<Integer, Bucket> resolveAll(
+            ImmutableSortedMap<Integer, Bucket> orig, ImmutableSortedMap<Integer, Bucket> buckets) {
+
+        if (buckets == null) {
+            return buckets;
+        }
+        ImmutableSortedMap.Builder<Integer, Bucket> builder = ImmutableSortedMap.naturalOrder();
+        for (Entry<Integer, Bucket> e : buckets.entrySet()) {
+            Integer index = e.getKey();
+            Bucket b = e.getValue();
+            if (b instanceof DeltaBucket) {
+                b = orig.get(((DeltaBucket) b).index);
+            }
+            builder.put(index, b);
+        }
+        return builder.build();
+    }
+
+    private static ImmutableList<Node> resolveAll(ImmutableList<Node> orig,
+            ImmutableList<Node> nodes) {
+        if (nodes == null) {
+            return nodes;
+        }
+        Set<String> names = new HashSet<>();
+        Builder<Node> builder = ImmutableList.builder();
+        for (Node node : nodes) {
+            if (node instanceof DeltaNode) {
+                node = orig.get(((DeltaNode) node).index);
+            }
+            if (names.contains(node.getName())) {
+                throw new IllegalStateException("Duplicated node: " + node);
+            }
+            names.add(node.getName());
+            builder.add(node);
+        }
+        return builder.build();
     }
 
     private ImmutableSortedMap<Integer, Bucket> delta(ImmutableSortedMap<Integer, Bucket> orig,
@@ -183,8 +257,13 @@ public class RevTreeImplDelta extends AbstractRevObject implements RevTree {
             return ImmutableList.of();
         }
 
-        ImmutableMap<String, Node> origmap = Maps.uniqueIndex(orig, (n) -> n.getName());
-
+        Map<String, Node> origmap = new HashMap<>();
+        try {
+            orig.forEach((n) -> origmap.put(n.getName(), n));
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            throw e;
+        }
         ImmutableList.Builder<Node> builder = ImmutableList.builder();
 
         for (int i = 0; i < actual.size(); i++) {
@@ -220,6 +299,9 @@ public class RevTreeImplDelta extends AbstractRevObject implements RevTree {
         }
 
         public Node resolve() {
+            if (null == tree) {
+                throw new IllegalStateException("Tree not set for DeltaNode");
+            }
             RevTree original = tree.original();
             ImmutableList<Node> subject = TYPE.FEATURE == type ? original.features()
                     : original.trees();
@@ -306,4 +388,5 @@ public class RevTreeImplDelta extends AbstractRevObject implements RevTree {
             return resolve().bounds();
         }
     }
+
 }

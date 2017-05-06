@@ -16,11 +16,12 @@ import org.locationtech.geogig.model.Node;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.RevTree;
 import org.locationtech.geogig.model.impl.AbstractRevObject;
+import org.locationtech.geogig.storage.datastream.Delta;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedMap;
 
-class RevTreeImpl implements RevTree {
+class RevTreeImpl implements RevTree, Delta {
 
     private final ObjectId id;
 
@@ -74,6 +75,16 @@ class RevTreeImpl implements RevTree {
     @Override
     public ImmutableSortedMap<Integer, Bucket> buckets() {
         return RevTreeFormat.buckets(data);
+    }
+
+    @Override
+    public int getDeltaLevel() {
+        return RevTreeFormat.deltaLevel(data);
+    }
+
+    @Override
+    public ObjectId getOriginalId() {
+        return RevTreeFormat.originalId(data);
     }
 
 }

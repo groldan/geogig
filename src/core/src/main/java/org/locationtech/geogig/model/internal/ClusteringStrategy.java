@@ -34,6 +34,7 @@ import org.locationtech.geogig.model.Node;
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.RevTree;
 import org.locationtech.geogig.model.impl.RevTreeBuilder;
+import org.locationtech.geogig.model.impl.RevTreeImplDelta;
 import org.locationtech.geogig.model.internal.DAG.STATE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -210,7 +211,11 @@ public abstract class ClusteringStrategy {
      * @return {@code 0} if the operation resulted in no change, {@code 1} if the node was
      *         inserted/updated, {@code -1} if the node was deleted
      */
-    public int put(final Node node) {
+    public int put(Node node) {
+        if (node instanceof RevTreeImplDelta.DeltaNode) {
+            node = ((RevTreeImplDelta.DeltaNode) node).resolve();
+            System.err.println("Resolved delta node to " + node);
+        }
         @Nullable
         final NodeId nodeId = computeId(node);
         if (null == nodeId) {

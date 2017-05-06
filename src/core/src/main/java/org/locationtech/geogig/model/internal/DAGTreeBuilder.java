@@ -42,7 +42,6 @@ import org.locationtech.geogig.model.internal.DAG.STATE;
 import org.locationtech.geogig.repository.impl.SpatialOps;
 import org.locationtech.geogig.storage.ObjectStore;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedMap;
@@ -181,11 +180,7 @@ public class DAGTreeBuilder {
         checkNotNull(clusteringStrategy);
         checkNotNull(targetStore);
         checkNotNull(abortFlag);
-        if (!header) {
-            System.err.printf(
-                    "STATUS\tID\tSIZE\tNODES\tBUCKETS\tORIG\tORIG SIZE\tORIG NODES\tORIG BUCKETS\n");
-            header = true;
-        }
+
         SharedState state = new SharedState(targetStore, clusteringStrategy, abortFlag);
 
         final DAG root = clusteringStrategy.buildRoot();
@@ -329,17 +324,17 @@ public class DAGTreeBuilder {
             if (!RevTree.EMPTY_TREE_ID.equals(root.originalTreeId())) {
                 RevTree orig = state.getTree(root.originalTreeId());
 
-                System.err.printf("%s\t%s\t%,d\t%,d\t%,d\t%s\t%,d\t%,d\t%,d\n", //
-                        root.getState(), //
-                        result.getId(), //
-                        result.size(), //
-                        result.features().size() + result.trees().size(), //
-                        result.buckets().size(), //
-                        orig.getId(), //
-                        orig.size(), //
-                        orig.features().size() + orig.trees().size(), //
-                        orig.buckets().size()//
-                );
+                // System.err.printf("%s\t%s\t%,d\t%,d\t%,d\t%s\t%,d\t%,d\t%,d\n", //
+                // root.getState(), //
+                // result.getId(), //
+                // result.size(), //
+                // result.features().size() + result.trees().size(), //
+                // result.buckets().size(), //
+                // orig.getId(), //
+                // orig.size(), //
+                // orig.features().size() + orig.trees().size(), //
+                // orig.buckets().size()//
+                // );
             }
 
             return state.isCancelled() ? null : result;
@@ -374,31 +369,32 @@ public class DAGTreeBuilder {
                 return null;
             }
 
-            RevTree tree = RevTreeBuilder.build(size, childTreeCount, treesList, featuresList,
-                    buckets);
+            RevTree tree;
 
-            if (!RevTree.EMPTY_TREE_ID.equals(root.originalTreeId())) {
+            if (RevTree.EMPTY_TREE_ID.equals(root.originalTreeId())) {
+                tree = RevTreeBuilder.build(size, childTreeCount, treesList, featuresList, buckets);
+            } else {
                 RevTree orig = state.getTree(root.originalTreeId());
-                System.err.printf("%s\t%s\t%,d\t%,d\t%,d\t%s\t%,d\t%,d\t%,d\n", //
-                        root.getState(), //
-                        tree.getId(), //
-                        tree.size(), //
-                        tree.features().size() + tree.trees().size(), //
-                        0, //
-                        orig.getId(), //
-                        orig.size(), //
-                        orig.features().size() + orig.trees().size(), //
-                        0//
-                );
+                // System.err.printf("%s\t%s\t%,d\t%,d\t%,d\t%s\t%,d\t%,d\t%,d\n", //
+                // root.getState(), //
+                // tree.getId(), //
+                // tree.size(), //
+                // tree.features().size() + tree.trees().size(), //
+                // 0, //
+                // orig.getId(), //
+                // orig.size(), //
+                // orig.features().size() + orig.trees().size(), //
+                // 0//
+                // );
 
-                RevTree deltaTree = RevTreeImplDelta.build(orig, size, childTreeCount, treesList,
-                        featuresList, buckets);
-
-                Preconditions.checkState(tree.trees().equals(deltaTree.trees()));
-                Preconditions.checkState(tree.features().equals(deltaTree.features()));
-                Preconditions.checkState(tree.buckets().equals(deltaTree.buckets()));
-
-                tree = deltaTree;
+                tree = RevTreeImplDelta.build(orig, size, childTreeCount, treesList, featuresList,
+                        buckets);
+                //
+                // Preconditions.checkState(tree.trees().equals(deltaTree.trees()));
+                // Preconditions.checkState(tree.features().equals(deltaTree.features()));
+                // Preconditions.checkState(tree.buckets().equals(deltaTree.buckets()));
+                //
+                // tree = deltaTree;
             }
             return tree;
 

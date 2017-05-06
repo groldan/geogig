@@ -84,6 +84,14 @@ class RevTreeFormat {
         return data.header().numTrees();
     }
 
+    public static int deltaLevel(DataBuffer data) {
+        return data.header().deltaLevel();
+    }
+
+    public static ObjectId originalId(DataBuffer data) {
+        return data.header().originalId();
+    }
+
     static ImmutableList<Node> trees(DataBuffer data) {
         final int offset = data.tail().getOffsetOfTreesNodeset();
         if (0 == offset) {

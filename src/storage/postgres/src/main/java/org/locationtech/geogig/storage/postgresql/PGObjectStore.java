@@ -75,6 +75,7 @@ import org.locationtech.geogig.storage.BulkOpListener;
 import org.locationtech.geogig.storage.ConfigDatabase;
 import org.locationtech.geogig.storage.ObjectInfo;
 import org.locationtech.geogig.storage.ObjectStore;
+import org.locationtech.geogig.storage.datastream.Delta;
 import org.locationtech.geogig.storage.datastream.LZFSerializationFactory;
 import org.locationtech.geogig.storage.datastream.v2_4.DataStreamSerializationFactoryV2_4;
 import org.locationtech.geogig.storage.impl.ObjectSerializingFactory;
@@ -701,10 +702,19 @@ public class PGObjectStore implements ObjectStore {
 
                 final int updateCount = ps.executeUpdate();
                 boolean inserted = updateCount == 1;
+                if (inserted) {
+                    logDelta(object);
+                }
                 return inserted;
             }
         } catch (SQLException e) {
             throw propagate(e);
+        }
+    }
+
+    private void logDelta(RevObject object) {
+        if (!(object instanceof Delta)) {
+            return;
         }
     }
 
@@ -940,7 +950,13 @@ public class PGObjectStore implements ObjectStore {
                                             callback.found(id, Integer.valueOf(bytes.length));
                                         }
                                         found.add(type.cast(obj));
-                                        sharedCache.put(obj);
+                                        try {
+                                            sharedCache.put(obj);
+                                        } catch (RuntimeException e) {
+                                            obj = encoder.read(id, bytes, 0, bytes.length);
+                                            e.printStackTrace();
+                                            throw e;
+                                        }
                                     }
                                 }
                             }
@@ -1209,6 +1225,7 @@ public class PGObjectStore implements ObjectStore {
         ObjectId id = o.getId();
         TYPE type = o.getType();
         byte[] serialized = serialize(o);
+        logDelta(o);
         return new EncodedObject(id, type, serialized);
     }
 

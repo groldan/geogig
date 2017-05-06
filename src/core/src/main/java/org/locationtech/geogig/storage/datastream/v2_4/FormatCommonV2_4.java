@@ -19,7 +19,6 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.function.Supplier;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.Bucket;
@@ -51,19 +50,22 @@ public class FormatCommonV2_4 extends FormatCommonV2_2 {
 
     @Override
     public void writeTree(RevTree tree, DataOutput data) throws IOException {
-        int mode = tree instanceof RevTreeImplDelta ? -1 : 1;
-        data.writeByte(mode);
-        if (mode == -1) {
-            final ObjectId originalTreeId = ((RevTreeImplDelta) tree).originalTreeId;
+        if (tree instanceof RevTreeImplDelta) {
+            RevTreeImplDelta d = (RevTreeImplDelta) tree;
+            final int deltaLevel = d.getDeltaLevel();
+            data.writeByte(deltaLevel);
+            final ObjectId originalTreeId = ((RevTreeImplDelta) tree).getOriginalId();
             originalTreeId.writeTo(data);
+        } else {
+            data.writeByte(0);
         }
         super.writeTree(tree, data);
     }
 
     @Override
     public RevTree readTree(@Nullable ObjectId id, DataInput in) throws IOException {
-        int mode = in.readByte() & 0xFF;
-        if (mode == 1) {
+        final int deltaLevel = in.readByte() & 0xFF;
+        if (deltaLevel == 0) {
             return super.readTree(id, in);
         }
         final ObjectId originalTreeId = readObjectId(in);
@@ -109,10 +111,10 @@ public class FormatCommonV2_4 extends FormatCommonV2_2 {
         ImmutableList<Node> trees = treesBuilder.build();
         ImmutableList<Node> features = featuresBuilder.build();
 
-        Supplier<RevTree> original = () -> source.getTree(originalTreeId);
-
         ImmutableSortedMap<Integer, Bucket> bkts = ImmutableSortedMap.copyOf(buckets);
-        RevTree tree = new RevTreeImplDelta(original, id, size, treeCount, trees, features, bkts);
+
+        RevTree tree = new RevTreeImplDelta(source, originalTreeId, deltaLevel, id, size, treeCount,
+                trees, features, bkts);
         return tree;
     }
 
