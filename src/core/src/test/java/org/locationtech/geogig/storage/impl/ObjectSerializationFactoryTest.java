@@ -600,6 +600,46 @@ public abstract class ObjectSerializationFactoryTest {
         assertTreesAreEqual(tree6_spatial_buckets, roundTripped);
     }
 
+    @Test
+    public void testStreaming() throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        RevCommit commit = testCommit.build();
+
+        serializer.write(commit, out);
+        serializer.write(tree1_leaves, out);
+        serializer.write(tree2_internal, out);
+        serializer.write(tree3_buckets, out);
+        serializer.write(tree4_spatial_leaves, out);
+        serializer.write(tree5_spatial_internal, out);
+        serializer.write(tree6_spatial_buckets, out);
+
+        out.close();
+
+        byte[] byteArray = out.toByteArray();
+        ByteArrayInputStream in = new ByteArrayInputStream(byteArray) {
+            private boolean closed;
+
+            public @Override void close() throws IOException {
+                closed = true;
+            }
+        };
+        RevObject o1 = serializer.read(null, in);
+        RevObject o2 = serializer.read(null, in);
+        RevObject o3 = serializer.read(null, in);
+        RevObject o4 = serializer.read(null, in);
+        RevObject o5 = serializer.read(null, in);
+        RevObject o6 = serializer.read(null, in);
+        RevObject o7 = serializer.read(null, in);
+
+        assertNotNull(o1);
+        assertNotNull(o2);
+        assertNotNull(o3);
+        assertNotNull(o4);
+        assertNotNull(o5);
+        assertNotNull(o6);
+        assertNotNull(o7);
+    }
+
     private byte[] write(RevTree tree) {
         try {
             ByteArrayOutputStream bout = new ByteArrayOutputStream();

@@ -55,9 +55,9 @@ public class LZ4SerializationFactory implements ObjectSerializingFactory {
     public RevObject read(ObjectId id, InputStream in) throws IOException {
         LZ4FastDecompressor decompressor = lz4factory.fastDecompressor();
         Checksum checksum = newChecksum();
-        try (LZ4BlockInputStream cin = new LZ4BlockInputStream(in, decompressor, checksum)) {
-            return factory.read(id, cin);
-        }
+        LZ4BlockInputStream cin = new LZ4BlockInputStream(in, decompressor, checksum);
+        return factory.read(id, cin);
+
     }
 
     private Checksum newChecksum() {
@@ -77,10 +77,10 @@ public class LZ4SerializationFactory implements ObjectSerializingFactory {
         final int blockSize = 1 << 16;
         LZ4Compressor compressor = lz4factory.fastCompressor();
         Checksum checksum = newChecksum();
-        try (LZ4BlockOutputStream cout = new LZ4BlockOutputStream(out, blockSize, compressor,
-                checksum, false)) {
-            factory.write(o, cout);
-        }
+        LZ4BlockOutputStream cout = new LZ4BlockOutputStream(out, blockSize, compressor, checksum,
+                true);
+        factory.write(o, cout);
+        cout.finish();// same as close but not closing the wrapped stream
     }
 
     @Override
