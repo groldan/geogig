@@ -1,0 +1,98 @@
+syntax = "proto3";
+option java_multiple_files = true;
+option java_package = "org.locationtech.geogig.grpc.storage";
+option java_outer_classname = "ObjectDatabaseRPC";
+
+package grpc;
+
+import "Lang.proto";
+import "model/ObjectId.proto";
+import "model/RevObject.proto";
+import "storage/ObjectInfo.proto";
+import "storage/ObjectStore.proto";
+import "storage/Conflict.proto";
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/empty.proto";
+
+message ConflictMessage{
+    string namespace = 1;
+    Conflict conflict = 2;
+}
+
+message ScopedPaths{
+    string namespace = 1;
+    repeated string paths = 2;
+}
+
+message BlobMessage{
+    string namespace = 1;
+    string path = 2;
+    bytes content = 3;
+    bool found = 4;
+}
+
+// There's no support for inheritance in GRPC, so we define the ObjectDatabase's
+// ObjectStore methods exactly the same than in ObjectStore and let the app handle
+// the bridge
+service ObjectDatabase{
+
+    ///////////////////////////////////////////////////////////////    
+    /////////////////   ObjectStore methods ///////////////
+    ///////////////////////////////////////////////////////////////    
+
+    rpc exists(ObjectId) returns (google.protobuf.BoolValue);
+    rpc lookUp(google.protobuf.StringValue) returns (stream ObjectId);
+    rpc put(stream RevObject) returns(stream BatchResult);
+    rpc get(stream ObjectId) returns(stream RevObject);
+    rpc delete(stream ObjectId) returns (stream BatchResult);
+    rpc getObjects(stream ObjectInfo) returns (stream ObjectInfo);
+
+    ///////////////////////////////////////////////////////////////    
+    ///////////////////   BlobStore methods  //////////////////////
+    ///////////////////////////////////////////////////////////////    
+    
+    rpc getBlob(BlobMessage) returns (BlobMessage);
+
+    rpc putBlob(BlobMessage) returns (google.protobuf.Empty);
+
+    rpc removeBlob(BlobMessage) returns (google.protobuf.Empty);
+    
+    rpc removeBlobs(google.protobuf.StringValue) returns (google.protobuf.Empty);
+    
+    ///////////////////////////////////////////////////////////////    
+    /////////////////   ConflictsDatabase methods ///////////////
+    ///////////////////////////////////////////////////////////////    
+
+    // boolean hasConflicts(@Nullable String namespace);
+    rpc hasConflicts(google.protobuf.StringValue) returns (google.protobuf.BoolValue);
+    
+    // long getCountByPrefix(@Nullable String namespace, @Nullable String treePath);
+    rpc getConflictsCount(StringTuple) returns (google.protobuf.UInt64Value);
+    
+    // Optional<Conflict> getConflict(@Nullable String namespace, String path);
+    rpc getConflict(StringTuple) returns (Conflict);
+    
+    // List<Conflict> getConflicts(@Nullable String namespace, @Nullable String pathFilter);
+    // Iterator<Conflict> getByPrefix(@Nullable String namespace, @Nullable String prefixFilter);
+    rpc getConflicts(StringTuple) returns (stream Conflict);
+    
+    // Set<String> findConflicts(@Nullable String namespace, Set<String> paths);
+    rpc findConflicts(ScopedPaths) returns (stream google.protobuf.StringValue);
+    
+    // void addConflict(@Nullable String namespace, Conflict conflict);
+    // void addConflicts(@Nullable String namespace, Iterable<Conflict> conflicts);
+    rpc addConflicts(stream ConflictMessage) returns (google.protobuf.Empty);
+
+    /* 
+     * @see void removeConflict(@Nullable String namespace, String path);
+     * @see void removeConflicts(@Nullable String namespace, Iterable<String> paths);
+     */
+    rpc removeConflicts(ScopedPaths) returns (google.protobuf.Empty);
+    
+    /*
+     * @param StringTuple accounts for namespace and pathPrefix
+     * @see void removeConflicts(@Nullable String namespace);
+     * @see void removeByPrefix(@Nullable String namespace, @Nullable String pathPrefix);
+     */
+    rpc removeConflictsByPrefix(StringTuple) returns (google.protobuf.Empty);
+}

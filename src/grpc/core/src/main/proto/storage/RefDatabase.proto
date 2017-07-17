@@ -1,0 +1,18 @@
+syntax = "proto3";
+option java_multiple_files = true;
+option java_package = "org.locationtech.geogig.grpc.storage";
+option java_outer_classname = "RefDatabaseRPC";
+
+package grpc;
+
+import "Lang.proto";
+import "model/Ref.proto";
+import "google/protobuf/wrappers.proto";
+
+service RefDatabase{
+    rpc getAll(google.protobuf.StringValue) returns (stream  Ref){};
+    rpc get(Ref) returns (Ref);
+    rpc put(Ref) returns (Ref);
+    rpc remove(google.protobuf.StringValue) returns (google.protobuf.StringValue);
+    rpc removeAll(google.protobuf.StringValue) returns (stream Ref);
+}

@@ -108,6 +108,7 @@
     <rocksdb.version>4.13.4</rocksdb.version>
     <postgresql.version>42.1.1</postgresql.version>
     <springweb.version>4.2.5.RELEASE</springweb.version>
+    <grpc.version>1.4.0</grpc.version>
 
     <appassembler.plugin.version>1.2.2</appassembler.plugin.version>
     <war.plugin.version>2.4</war.plugin.version>
@@ -263,6 +264,23 @@
         <groupId>org.fusesource.jansi</groupId>
         <artifactId>jansi</artifactId>
         <version>1.11</version>
+      </dependency>
+
+      <!-- GRPC -->
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-netty</artifactId>
+        <version>${grpc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-protobuf</artifactId>
+        <version>${grpc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-stub</artifactId>
+        <version>${grpc.version}</version>
       </dependency>
 
       <!-- Logging -->
@@ -652,6 +670,7 @@
      <modules>
        <module>../ql</module>
        <module>../gui</module>
+       <module>../grpc</module>
      </modules>
     </profile>
     <profile>

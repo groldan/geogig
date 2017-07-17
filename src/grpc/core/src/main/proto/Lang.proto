@@ -1,0 +1,14 @@
+syntax = "proto3";
+option java_multiple_files = true;
+option java_package = "org.locationtech.geogig.grpc";
+option java_outer_classname = "LangRPC";
+option objc_class_prefix = "GG";
+
+package grpc;
+
+
+message StringTuple{
+    string key = 1;
+    string value = 2;
+}
+

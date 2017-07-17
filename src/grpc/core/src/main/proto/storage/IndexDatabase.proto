@@ -1,0 +1,69 @@
+syntax = "proto3";
+option java_multiple_files = true;
+option java_package = "org.locationtech.geogig.grpc.storage";
+option java_outer_classname = "IndexDatabaseRPC";
+
+package grpc;
+
+import "Lang.proto";
+import "model/ObjectId.proto";
+import "model/RevObject.proto";
+import "storage/ObjectInfo.proto";
+import "storage/ObjectStore.proto";
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/empty.proto";
+
+message IndexInfo{
+    bytes serialForm = 1;
+}
+message IndexedTreeInfo{
+    IndexInfo indexInfo = 1;
+    ObjectId originalTree = 2;
+    ObjectId indexedTree = 3;
+}
+
+// There's no support for inheritance in GRPC, so we define the IndexDatabase's
+// ObjectStore methods exactly the same than in ObjectStore and let the app handle
+// the bridge
+service IndexDatabase{
+
+    ///////////////////////////////////////////////////////////////    
+    /////////////////   ObjectStore methods ///////////////
+    ///////////////////////////////////////////////////////////////    
+
+    rpc exists(ObjectId) returns (google.protobuf.BoolValue);
+    rpc lookUp(google.protobuf.StringValue) returns (stream ObjectId);
+    rpc put(stream RevObject) returns(stream BatchResult);
+    rpc get(stream ObjectId) returns(stream RevObject);
+    rpc delete(stream ObjectId) returns (stream BatchResult);
+    rpc getObjects(stream ObjectInfo) returns (stream ObjectInfo);
+
+
+
+    ///////////////////////////////////////////////////////////////    
+    /////////////////   IndexDatabase methods ///////////////
+    ///////////////////////////////////////////////////////////////    
+
+    // IndexInfo createIndexInfo(String treeName, String attributeName, IndexType strategy, @Nullable Map<String, Object> metadata);
+    rpc createIndexInfo(IndexInfo) returns (IndexInfo);
+    
+    // IndexInfo updateIndexInfo(String treeName, String attributeName, IndexType strategy, Map<String, Object> metadata);
+    rpc updateIndexInfo(IndexInfo) returns (IndexInfo);
+    
+    // Optional<IndexInfo> getIndexInfo(String treeName, String attributeName);
+    // List<IndexInfo> getIndexInfos(String treeName);
+    // List<IndexInfo> getIndexInfos();
+    rpc getIndexInfos(StringTuple) returns (stream IndexInfo);
+    
+    // boolean dropIndex(IndexInfo index);
+    rpc dropIndexInfo(IndexInfo) returns (google.protobuf.BoolValue);
+    
+    // void clearIndex(IndexInfo index);
+    rpc clearIndex(IndexInfo) returns (google.protobuf.Empty);
+    
+    // void addIndexedTree(IndexInfo index, ObjectId originalTree, ObjectId indexedTree);
+    rpc addIndexedTree(IndexedTreeInfo) returns (google.protobuf.Empty);
+    
+    // Optional<ObjectId> resolveIndexedTree(IndexInfo index, ObjectId treeId);
+    rpc resolveIndexedTree(IndexedTreeInfo) returns (ObjectId);
+}

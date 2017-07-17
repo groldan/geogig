@@ -1,0 +1,47 @@
+syntax = "proto3";
+option java_multiple_files = true;
+option java_package = "org.locationtech.geogig.grpc.storage";
+option java_outer_classname = "ConfigDatabaseRPC";
+
+package grpc;
+
+import "Lang.proto";
+import "google/protobuf/wrappers.proto";
+
+message GetQuery{
+    bool global = 1;
+    bool all = 2;
+    bool subsections = 3;
+    string section = 4;
+    string key = 5;
+}
+
+message PutQuery{
+    bool global = 1;
+    string key = 2;
+    string value = 3;
+}
+
+service ConfigDatabase{
+    // public Optional<String> get(String key);
+    // public Optional<String> getGlobal(String key);
+    // public Map<String, String> getAll();
+    // public Map<String, String> getAllGlobal();
+    // public Map<String, String> getAllSection(String section);
+    // public Map<String, String> getAllSectionGlobal(String section);
+    // public List<String> getAllSubsections(String section);
+    // public List<String> getAllSubsectionsGlobal(String section);
+    rpc get(GetQuery) returns (stream StringTuple);
+
+    rpc getSubsections(GetQuery) returns (stream google.protobuf.StringValue);
+
+    // public void put(String key, Object value);
+    // public void putGlobal(String key, Object value);
+    rpc put(PutQuery) returns (StringTuple);
+    
+    // public void remove(String key);
+    // public void removeGlobal(String key);
+    // public void removeSection(String key);
+    // public void removeSectionGlobal(String key);
+    rpc remove(GetQuery) returns (stream StringTuple);
+}

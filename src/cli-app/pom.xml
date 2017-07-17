@@ -217,6 +217,21 @@
             <artifactId>geogig-gui</artifactId>
             <version>${project.version}</version>
           </dependency>
+          <dependency>
+            <groupId>org.locationtech.geogig</groupId>
+            <artifactId>geogig-grpc-core</artifactId>
+            <version>${project.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.locationtech.geogig</groupId>
+            <artifactId>geogig-grpc-client</artifactId>
+            <version>${project.version}</version>
+          </dependency>
+          <dependency>
+            <groupId>org.locationtech.geogig</groupId>
+            <artifactId>geogig-grpc-server</artifactId>
+            <version>${project.version}</version>
+          </dependency>
       </dependencies>
     </profile>
   </profiles>

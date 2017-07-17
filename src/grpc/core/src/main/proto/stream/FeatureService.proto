@@ -1,0 +1,62 @@
+syntax = "proto3";
+option java_multiple_files = true;
+option java_package = "org.locationtech.geogig.grpc.stream";
+option java_outer_classname = "FeatureServiceRPC";
+
+package grpc;
+
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/empty.proto";
+import "model/RevObject.proto";
+
+message GetFeaturesQuery{
+    //optional tree-ish to resolve as head (e.g. HEAD, 
+    // a branch name, an hex encoded commit id). Defaults to HEAD
+    string head = 1;
+    //name of the tree (aka, feature layer) to query
+    string tree = 2;
+    repeated string attributes = 3;
+    string outputCrs = 4;
+    BoundsMessage boundsFilter = 5;
+    uint32 canvasWidth = 6;
+    uint32 canvasHeight = 7;
+}
+
+message FeatureMessage{
+    string fid = 1;
+    repeated AttributeValue values = 2;
+}
+
+message AttributeValue{
+    oneof value {
+        bytes wkb = 1;
+        int32 intval = 2;
+        int64 longval = 3;
+        float floatval = 4;
+        double doubleval = 5;
+        string stringval = 6;
+        bool boolval = 7;
+    }
+}
+
+message BoundsMessage{
+    double minX = 1;
+    double maxX = 2;
+    double minY = 3;
+    double maxY = 4;
+    string crs = 5;
+}
+
+service FeatureService{
+
+    rpc getTypeNames(google.protobuf.Empty) returns (stream google.protobuf.StringValue);
+    
+    rpc getSchema(google.protobuf.StringValue) returns (RevObject);
+        
+    rpc getCount(GetFeaturesQuery) returns (google.protobuf.UInt64Value);
+
+    rpc getBounds(GetFeaturesQuery) returns (BoundsMessage);
+
+    rpc getFeatures(GetFeaturesQuery) returns (stream FeatureMessage);
+    
+}

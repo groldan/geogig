@@ -1,0 +1,133 @@
+syntax = "proto3";
+option java_multiple_files = true;
+option java_package = "org.locationtech.geogig.grpc.storage";
+option java_outer_classname = "GraphDatabaseRPC";
+
+package grpc;
+
+import "model/ObjectId.proto";
+import "google/protobuf/wrappers.proto";
+import "google/protobuf/empty.proto";
+
+/**
+ * Enumeration describing a relationship direction between two {@code GraphNode}s.
+ */
+enum Direction {
+    OUT = 0;
+    IN = 1;
+    BOTH = 2;
+}
+
+message EdgesQuery{
+    ObjectId identifier = 1;
+    Direction direction = 2;
+}
+
+/*
+ * Represents a single commit in the repository commit graph.
+ */
+message GraphNode {
+    // the {@link ObjectId} associated with this node
+    ObjectId identifier = 1;
+
+    //{@code true} if this node represents a sparse commit
+    bool sparse = 2;
+};
+
+/*
+ * Represents a single connection between two {@code GraphNode}s.
+ */
+message GraphEdge {
+    GraphNode from = 1;
+    GraphNode to = 2;
+}
+
+message GraphCommitMessage{
+    ObjectId commitId = 1;
+    repeated ObjectId parentIds = 2;
+}
+
+message ObjectIdMapping{
+    ObjectId mapped = 1;
+    ObjectId original = 2;
+}
+
+message GraphProperyMessage{
+    ObjectId commitId = 1;
+    string propertyName = 2;
+    string propertyValue = 3;
+}
+
+service GraphDatabase{
+    /*
+     * Determines if the given commit exists in the graph database.
+     * 
+     * @param commitId the commit id to search for
+     * @return true if the commit exists, false otherwise
+     */
+    rpc exists(ObjectId) returns (google.protobuf.BoolValue);
+
+    /*
+     * Retrieves all of the parents for the given commit.
+     * 
+     * @param commitid the commit whose parents should be returned
+     * @return a list of the parents of the provided commit
+     */
+    rpc getParents(ObjectId) returns (stream ObjectId);
+
+    /*
+     * Retrieves all of the children for the given commit.
+     * 
+     * @param commitid the commit whose children should be returned
+     * @return a list of the children of the provided commit
+     * @throws IllegalArgumentException
+     */
+    rpc getChildren(ObjectId) returns (stream ObjectId);
+
+    rpc put(GraphCommitMessage) returns (google.protobuf.BoolValue);
+
+    /*
+     * Maps a commit to another original commit. This is used in sparse repositories.
+     * 
+     * @param mapped the id of the mapped commit
+     * @param original the commit to map to
+     */
+    rpc map(ObjectIdMapping) returns (google.protobuf.Empty);
+
+    /*
+     * Gets the id of the commit that this commit is mapped to.
+     * 
+     * @param commitId the commit to find the mapping of
+     * @return the mapped commit id
+     */
+    rpc getMapping(ObjectId) returns (ObjectId);
+
+    /*
+     * Gets the number of ancestors of the commit until it reaches one with no parents, for example
+     * the root or an orphaned commit.
+     * 
+     * @param commitId the commit id to start from
+     * @return the depth of the commit
+     */
+    rpc getDepth(ObjectId) returns (google.protobuf.Int32Value);
+
+    /*
+     * Set a property on the provided commit node.
+     */
+    rpc setProperty(GraphProperyMessage) returns (google.protobuf.Empty);
+
+    /*
+     * Retrieves the {@code GraphNode} that represents the provided identifier.
+     * 
+     * @param id the identifier
+     * @return the {@code GraphNode}
+     */
+    rpc getNode(ObjectId) returns (GraphNode);
+
+    rpc getEdges(EdgesQuery) returns (stream GraphEdge);
+    
+    /*
+     * Drops all data from the graph database. Usually used when rebuilding the graph.
+     */
+    rpc truncate(google.protobuf.Empty) returns (google.protobuf.Empty);
+}

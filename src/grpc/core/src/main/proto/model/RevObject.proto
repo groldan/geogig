@@ -1,0 +1,22 @@
+syntax = "proto3";
+option java_multiple_files = true;
+option java_package = "org.locationtech.geogig.grpc.model";
+option java_outer_classname = "RevObjectRPC";
+
+package grpc;
+
+import "model/ObjectId.proto";
+
+message RevObject{
+    enum TYPE{
+        COMMIT = 0;
+        TREE = 1;
+        FEATURE = 2;
+        TAG = 3;
+        FEATURETYPE =4;
+    }
+    
+    TYPE type = 1;
+    ObjectId id = 2;
+    bytes serialForm = 3;
+}

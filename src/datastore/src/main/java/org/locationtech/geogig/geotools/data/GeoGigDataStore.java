@@ -105,8 +105,15 @@ public class GeoGigDataStore extends ContentDataStore implements DataStore {
     @Deprecated
     private boolean autoIndexing;
 
+    private final boolean closeRepoOnDispose;
+
     public GeoGigDataStore(Repository repository) {
+        this(repository, true);
+    }
+
+    public GeoGigDataStore(Repository repository, boolean closeRepoOnDispose) {
         super();
+        this.closeRepoOnDispose = closeRepoOnDispose;
         Preconditions.checkNotNull(repository);
 
         this.repository = repository;
@@ -116,7 +123,9 @@ public class GeoGigDataStore extends ContentDataStore implements DataStore {
     @Override
     public void dispose() {
         super.dispose();
-        repository.close();
+        if (closeRepoOnDispose) {
+            repository.close();
+        }
     }
 
     /**

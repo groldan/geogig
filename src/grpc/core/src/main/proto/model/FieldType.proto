@@ -1,0 +1,52 @@
+syntax = "proto3";
+option java_multiple_files = true;
+option java_package = "org.locationtech.geogig.grpc.model";
+option java_outer_classname = "FieldTypeRPC";
+
+package grpc;
+
+import "google/protobuf/wrappers.proto";
+
+enum FieldType {
+    NULL = 0x00;
+    BOOLEAN = 0x01;
+    BYTE = 0x02;
+    SHORT = 0x03;
+    INTEGER = 0x04;
+    LONG = 0x05;
+    FLOAT = 0x06;
+    DOUBLE = 0x07;
+    STRING = 0x08;
+    BOOLEAN_ARRAY = 0x09;
+    BYTE_ARRAY = 0x0A;
+    SHORT_ARRAY = 0x0B;
+    INTEGER_ARRAY = 0x0C;
+    LONG_ARRAY = 0x0D;
+    FLOAT_ARRAY = 0x0E;
+    DOUBLE_ARRAY = 0x0F;
+    STRING_ARRAY = 0x10;
+    POINT = 0x11;
+    LINESTRING = 0x12;
+    POLYGON = 0x13;
+    MULTIPOINT = 0x14;
+    MULTILINESTRING = 0x15;
+    MULTIPOLYGON = 0x16;
+    GEOMETRYCOLLECTION = 0x17;
+    GEOMETRY = 0x18;
+    UUID = 0x19;
+    BIG_INTEGER = 0x1A;
+    BIG_DECIMAL = 0x1B;
+    DATETIME = 0x1C;
+    DATE = 0x1D;
+    TIME = 0x1E;
+    TIMESTAMP = 0x1F;
+    MAP = 0x20;
+    CHAR = 0x21;
+    CHAR_ARRAY = 0x22;
+    ENVELOPE_2D = 0x23;
+    UNKNOWN = -1;
+}
+
+message FieldValue{
+    google.protobuf.BoolValue val = 1;
+}
