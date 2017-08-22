@@ -19,10 +19,12 @@ import java.util.List;
 import java.util.Map;
 
 import org.locationtech.geogig.model.ObjectId;
+import org.locationtech.geogig.model.RevCommit;
 import org.locationtech.geogig.plumbing.ResolveGeogigURI;
 import org.locationtech.geogig.repository.Platform;
 import org.locationtech.geogig.storage.GraphDatabase;
 
+import com.google.common.annotations.Beta;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
@@ -277,4 +279,5 @@ public class HeapGraphDatabase implements GraphDatabase {
     public GraphNode getNode(ObjectId id) {
         return new HeapGraphNode(graph.get(id).get());
     }
+
 }

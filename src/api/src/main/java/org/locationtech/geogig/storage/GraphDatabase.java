@@ -13,6 +13,7 @@ import java.io.Closeable;
 import java.util.Iterator;
 
 import org.locationtech.geogig.model.ObjectId;
+import org.locationtech.geogig.model.RevCommit;
 import org.locationtech.geogig.repository.RepositoryConnectionException;
 
 import com.google.common.annotations.Beta;
@@ -240,4 +241,10 @@ public interface GraphDatabase extends Closeable {
      * Drops all data from the graph database. Usually used when rebuilding the graph.
      */
     public void truncate();
+
+    @Beta
+    public default void putAll(Iterable<RevCommit> commits) {
+        commits.forEach((c) -> put(c.getId(), c.getParentIds()));
+    }
+
 }

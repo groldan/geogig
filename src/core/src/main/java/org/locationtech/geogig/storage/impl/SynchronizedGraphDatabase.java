@@ -10,6 +10,7 @@
 package org.locationtech.geogig.storage.impl;
 
 import org.locationtech.geogig.model.ObjectId;
+import org.locationtech.geogig.model.RevCommit;
 import org.locationtech.geogig.repository.RepositoryConnectionException;
 import org.locationtech.geogig.storage.GraphDatabase;
 
@@ -111,4 +112,11 @@ public class SynchronizedGraphDatabase implements GraphDatabase {
             return delegate.getNode(id);
         }
     }
+
+    public @Override void putAll(Iterable<RevCommit> commits) {
+        synchronized (delegate) {
+            delegate.putAll(commits);
+        }
+    }
+
 }

@@ -28,6 +28,7 @@ import java.util.Queue;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.ObjectId;
+import org.locationtech.geogig.model.RevCommit;
 import org.locationtech.geogig.plumbing.ResolveGeogigURI;
 import org.locationtech.geogig.repository.Hints;
 import org.locationtech.geogig.repository.Platform;
@@ -153,6 +154,35 @@ public class RocksdbGraphDatabase implements GraphDatabase {
             return ImmutableList.copyOf(node.incoming);
         }
         return ImmutableList.of();
+    }
+
+    public @Override void putAll(Iterable<RevCommit> commits) {
+        try (WriteBatch batch = new WriteBatch()) {
+            for (RevCommit c : commits) {
+                NodeData node = getNodeInternal(c.getId(), false);
+                if (node == null) {
+                    node = new NodeData(c.getId(), c.getParentIds());
+                }
+                batch.put(c.getId().getRawValue(), BINDING.objectToEntry(node));
+                for (ObjectId parent : c.getParentIds()) {
+                    NodeData parentNode = getNodeInternal(parent, false);
+                    if (parentNode == null) {
+                        parentNode = new NodeData(parent);
+                    }
+                    if (!parentNode.incoming.contains(c.getId())) {
+                        parentNode.incoming.add(c.getId());
+                    }
+                    batch.put(parent.getRawValue(), BINDING.objectToEntry(parentNode));
+                }
+            }
+            try (RocksDBReference dbRef = dbhandle.getReference();
+                    WriteOptions wo = new WriteOptions()) {
+                wo.setSync(true);
+                dbRef.db().write(wo, batch);
+            }
+        } catch (Exception e) {
+            throw Throwables.propagate(e);
+        }
     }
 
     @Override
@@ -513,7 +543,8 @@ public class RocksdbGraphDatabase implements GraphDatabase {
 
         public boolean isSparse() {
             return properties.containsKey(SPARSE_FLAG)
-                    ? Boolean.valueOf(properties.get(SPARSE_FLAG)) : false;
+                    ? Boolean.valueOf(properties.get(SPARSE_FLAG))
+                    : false;
         }
     }
 }

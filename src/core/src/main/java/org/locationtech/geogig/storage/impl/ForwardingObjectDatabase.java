@@ -34,6 +34,14 @@ public class ForwardingObjectDatabase implements ObjectDatabase {
 
     protected final Provider<? extends ObjectDatabase> subject;
 
+    public ObjectDatabase unwrap() {
+        ObjectDatabase db = subject.get();
+        if (db instanceof ForwardingObjectDatabase) {
+            db = ((ForwardingObjectDatabase) db).unwrap();
+        }
+        return db;
+    }
+
     public ForwardingObjectDatabase(Provider<? extends ObjectDatabase> odb) {
         this.subject = odb;
     }
