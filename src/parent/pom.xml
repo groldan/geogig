@@ -652,6 +652,7 @@
      <modules>
        <module>../ql</module>
        <module>../gui</module>
+       <module>../benchmark</module>
      </modules>
     </profile>
     <profile>
