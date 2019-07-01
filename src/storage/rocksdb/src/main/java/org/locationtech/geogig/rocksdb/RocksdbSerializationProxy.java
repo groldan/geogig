@@ -26,10 +26,10 @@ class RocksdbSerializationProxy extends RevObjectSerializerProxy {
      * For historical reasons, the LZF wrapped formats must be kept
      */
     private static final RevObjectSerializer[] SUPPORTED_FORMATS = { //
-            new RevObjectSerializerLZF(DataStreamRevObjectSerializerV1.INSTANCE), //
-            new RevObjectSerializerLZF(DataStreamRevObjectSerializerV2.INSTANCE), //
-            new RevObjectSerializerLZF(DataStreamRevObjectSerializerV2_1.INSTANCE), //
-            new RevObjectSerializerLZF(DataStreamRevObjectSerializerV2_2.INSTANCE)//
+            null, // new RevObjectSerializerLZF(DataStreamRevObjectSerializerV1.INSTANCE), //
+            null, // new RevObjectSerializerLZF(DataStreamRevObjectSerializerV2.INSTANCE), //
+            null, // new RevObjectSerializerLZF(DataStreamRevObjectSerializerV2_1.INSTANCE), //
+            null// new RevObjectSerializerLZF(DataStreamRevObjectSerializerV2_2.INSTANCE)//
             // The above formats oughta stay like that for backwards compatibility
             , new FlatBuffersRevObjectSerializer()//
     };
