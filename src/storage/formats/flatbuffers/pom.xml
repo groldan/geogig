@@ -16,7 +16,37 @@
   <properties>
     <fbs.sources>${project.basedir}/src/main/resources/fbs</fbs.sources>
     <fbs.generated.sources>${project.build.directory}/generated-sources/java</fbs.generated.sources>
+    <fbs.executable>${project.build.directory}/bin/flatc</fbs.executable>
+    <fbs.executable.package.type>tar.gz</fbs.executable.package.type>
+    <fbs.executable.package.distribution>distribution-linux</fbs.executable.package.distribution>
   </properties>
+
+  <profiles>
+    <profile>
+      <id>platform-windows</id>
+      <activation>
+        <os>
+          <family>windows</family>
+        </os>
+      </activation>
+      <properties>
+        <fbs.executable>${project.build.directory}/bin/flatc.exe</fbs.executable>
+        <fbs.executable.package.type>zip</fbs.executable.package.type>
+        <fbs.executable.package.distribution>distribution-windows</fbs.executable.package.distribution>
+      </properties>
+    </profile>
+    <profile>
+      <id>platform-osx</id>
+      <activation>
+        <os>
+          <family>mac</family>
+        </os>
+      </activation>
+      <properties>
+        <fbs.executable.package.distribution>distribution-osx</fbs.executable.package.distribution>
+      </properties>
+    </profile>
+  </profiles>
 
   <build>
     <plugins>
@@ -47,8 +77,8 @@
                   <groupId>com.github.davidmoten</groupId>
                   <artifactId>flatbuffers-compiler</artifactId>
                   <version>${flatbuffers-compiler.version}</version>
-                  <type>tar.gz</type>
-                  <classifier>distribution-linux</classifier>
+                  <type>${fbs.executable.package.type}</type>
+                  <classifier>${fbs.executable.package.distribution}</classifier>
                   <overWrite>true</overWrite>
                   <outputDirectory>${project.build.directory}</outputDirectory>
                 </artifactItem>
@@ -70,7 +100,7 @@
           </execution>
         </executions>
         <configuration>
-          <executable>${project.build.directory}/bin/flatc</executable>
+          <executable>${fbs.executable}</executable>
           <workingDirectory>${fbs.sources}</workingDirectory>
           <arguments>
             <argument>--java</argument>

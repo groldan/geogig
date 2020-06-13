@@ -3,9 +3,18 @@ on: [push]
 
 jobs:
   build:
-    name: Build and Test 
-    runs-on: ubuntu-latest
+    name: Build
     timeout-minutes: 60
+    runs-on: ${{ matrix.os }} 
+    strategy:
+      matrix:
+        #os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
+        #include:
+        #- os: ubuntu-latest
+        #  TARGET: x86_64-unknown-linux-musl
+        #- os: macos-latest
+        #  TARGET: x86_64-apple-darwin
 
     # env:
 
@@ -16,24 +25,27 @@ jobs:
           persist-credentials: false
           lfs: true
 
+       #- run: echo ${{matrix.TARGET}}
+
       - name: Maven repository cache
         uses: actions/cache@v1.1.0
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          #key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: maven-cache-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-                  ${{ runner.os }}-maven-
+                  maven-cache-
 
       - name: Update maven dependencies
         # see https://github.com/qaware/go-offline-maven-plugin
         run: mvn -f src/ de.qaware.maven:go-offline-maven-plugin:resolve-dependencies --no-transfer-progress
          
       - name: Build without tests
-        run: mvn -f src/ -DskipTests -T1C -Dfmt.action=validate install -Pexperimental
+        run: mvn -f src/ -D skipTests=true -D fmt.action=validate install -P experimental
 
       - name: Verify
         #The github profile awaits for necessary docker containers to be ready, but does not tear them down, so they're reused across module builds
         run: |
-                mvn -f src/metadata -Dfmt.skip clean install
-                mvn -f src/ -T1C -Dfmt.skip verify -Pexperimental -rf :geogig-api
+                mvn -f src/metadata -D fmt.skip=true clean install
+                mvn -f src/ -T 1C -D fmt.skip=true verify -P experimental -rf :geogig-api
 
