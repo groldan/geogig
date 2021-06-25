@@ -9,10 +9,10 @@
  */
 package org.locationtech.geogig.transaction;
 
-import java.util.Iterator;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.repository.Conflict;
@@ -103,7 +103,7 @@ class TransactionConflictsDatabase implements ConflictsDatabase {
         database.removeConflicts(txNamespace);
     }
 
-    public @Override Iterator<Conflict> getByPrefix(@Nullable String namespace,
+    public @Override Stream<Conflict> getByPrefix(@Nullable String namespace,
             @Nullable String prefixFilter) {
 
         return database.getByPrefix(txNamespace, prefixFilter);

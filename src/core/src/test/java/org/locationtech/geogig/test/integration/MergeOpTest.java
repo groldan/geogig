@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.junit.Test;
 import org.locationtech.geogig.feature.Feature;
@@ -63,7 +64,6 @@ import org.locationtech.geogig.repository.Conflict;
 import org.locationtech.geogig.repository.ProgressListener;
 
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
 
 public class MergeOpTest extends RepositoryTestCase {
 
@@ -888,7 +888,8 @@ public class MergeOpTest extends RepositoryTestCase {
         String msg = repo.command(ReadMergeCommitMessageOp.class).call();
         assertFalse(Strings.isNullOrEmpty(msg));
 
-        List<Conflict> conflicts = Lists.newArrayList(repo.command(ConflictsQueryOp.class).call());
+        List<Conflict> conflicts = repo.command(ConflictsQueryOp.class).call()
+                .collect(Collectors.toList());
         assertEquals(1, conflicts.size());
         String path = NodeRef.appendChild(pointsName, idP1);
         assertEquals(conflicts.get(0).getPath(), path);

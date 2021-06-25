@@ -12,6 +12,7 @@ package org.locationtech.geogig.storage.decorator;
 import java.util.Iterator;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.repository.Conflict;
@@ -55,7 +56,7 @@ public @RequiredArgsConstructor class ForwardingConflictsDatabase implements Con
         actual.checkOpen();
     }
 
-    public @Override Iterator<Conflict> getByPrefix(@Nullable String namespace,
+    public @Override Stream<Conflict> getByPrefix(@Nullable String namespace,
             @Nullable String prefixFilter) {
         return actual.getByPrefix(namespace, prefixFilter);
     }

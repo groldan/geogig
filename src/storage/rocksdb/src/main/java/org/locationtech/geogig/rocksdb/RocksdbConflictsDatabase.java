@@ -25,6 +25,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.ObjectId;
@@ -45,6 +46,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
+import com.google.common.collect.Streams;
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
 
@@ -196,9 +198,9 @@ public class RocksdbConflictsDatabase extends AbstractStore implements Conflicts
         return Optional.ofNullable(c);
     }
 
-    public @Override Iterator<Conflict> getByPrefix(@Nullable String txId,
+    public @Override Stream<Conflict> getByPrefix(@Nullable String txId,
             @Nullable String prefixFilter) {
-        return new BatchIterator(this, txId, prefixFilter);
+        return Streams.stream(new BatchIterator(this, txId, prefixFilter));
     }
 
     public @Override long getCountByPrefix(@Nullable String txId, @Nullable String treePath) {

@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.ObjectId;
@@ -39,6 +40,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Streams;
 
 import lombok.NonNull;
 
@@ -226,9 +228,10 @@ public class PGConflictsDatabase extends AbstractStore implements ConflictsDatab
         return hasConflicts;
     }
 
-    public @Override Iterator<Conflict> getByPrefix(@Nullable String namespace,
+    public @Override Stream<Conflict> getByPrefix(@Nullable String namespace,
             @Nullable String treePath) {
-        return new ConflictsIterator(this, namespace, treePath);
+        Iterator<Conflict> conflicts = new ConflictsIterator(this, namespace, treePath);
+        return Streams.stream(conflicts);
     }
 
     List<Conflict> getBatch(@Nullable String namespace, @Nullable String treePath, int offset,

@@ -10,8 +10,8 @@
 package org.locationtech.geogig.cli.porcelain;
 
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.fusesource.jansi.Ansi;
 import org.fusesource.jansi.Ansi.Color;
@@ -32,7 +32,7 @@ import org.locationtech.geogig.porcelain.StatusOp.StatusSummary;
 import org.locationtech.geogig.repository.Conflict;
 import org.locationtech.geogig.storage.AutoCloseableIterator;
 
-import com.google.common.collect.Iterators;
+import com.google.common.base.Supplier;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -88,33 +88,34 @@ public class Status extends AbstractCommand implements CLICommand {
     }
 
     private void print(Console console, StatusSummary summary) throws IOException {
-        long countStaged = summary.getCountStaged();
-        long countUnstaged = summary.getCountUnstaged();
-        long countConflicted = summary.getCountConflicts();
+        long stagedCount = summary.getCountStaged();
+        long unstagedCount = summary.getCountUnstaged();
+        long conflictsCount = summary.getCountConflicts();
 
-        if (countStaged + countUnstaged + countConflicted == 0) {
+        if (stagedCount + unstagedCount + conflictsCount == 0) {
             console.println("nothing to commit (working directory clean)");
+            return;
         }
 
-        if (countStaged > 0) {
+        if (stagedCount > 0) {
             console.println("# Changes to be committed:");
             console.println("#   (use \"geogig reset HEAD <path/to/fid>...\" to unstage)");
             console.println("#");
             try (AutoCloseableIterator<DiffEntry> iter = summary.getStaged().get()) {
-                print(console, iter, Color.GREEN, countStaged);
+                print(console, iter, Color.GREEN, stagedCount);
             }
             console.println("#");
         }
 
-        if (countConflicted > 0) {
+        if (conflictsCount > 0) {
             console.println("# Unmerged paths:");
             console.println(
                     "#   (use \"geogig add/rm <path/to/fid>...\" as appropriate to mark resolution");
             console.println("#");
-            printUnmerged(console, summary.getConflicts().get(), Color.RED, countConflicted);
+            printUnmerged(console, summary.getConflicts(), Color.RED, conflictsCount);
         }
 
-        if (countUnstaged > 0) {
+        if (unstagedCount > 0) {
             console.println("# Changes not staged for commit:");
             console.println(
                     "#   (use \"geogig add <path/to/fid>...\" to update what will be committed");
@@ -122,7 +123,7 @@ public class Status extends AbstractCommand implements CLICommand {
                     "#   (use \"geogig checkout -- <path/to/fid>...\" to discard changes in working directory");
             console.println("#");
             try (AutoCloseableIterator<DiffEntry> iter = summary.getUnstaged().get()) {
-                print(console, iter, Color.RED, countUnstaged);
+                print(console, iter, Color.RED, unstagedCount);
             }
         }
 
@@ -171,7 +172,7 @@ public class Status extends AbstractCommand implements CLICommand {
         console.println(ansi.toString());
     }
 
-    private void printUnmerged(final Console console, Iterator<Conflict> iterator,
+    private void printUnmerged(final Console console, Supplier<Stream<Conflict>> conflictsSupplier,
             final Color color, final long total) throws IOException {
 
         final int limit = all || this.limit == null ? Integer.MAX_VALUE : this.limit.intValue();
@@ -180,15 +181,17 @@ public class Status extends AbstractCommand implements CLICommand {
 
         Ansi ansi = newAnsi(console, sb);
 
-        String path;
         if (limit > 0) {
-            iterator = Iterators.limit(iterator, limit);
-            while (iterator.hasNext()) {
-                Conflict c = iterator.next();
-                path = c.getPath();
-                sb.setLength(0);
-                ansi.a("#      ").fg(color).a("unmerged").a("  ").a(path).reset();
-                console.println(ansi.toString());
+            try (Stream<Conflict> conflicts = conflictsSupplier.get().limit(limit)) {
+                conflicts.map(Conflict::getPath).forEach(path -> {
+                    sb.setLength(0);
+                    ansi.a("#      ").fg(color).a("unmerged").a("  ").a(path).reset();
+                    try {
+                        console.println(ansi.toString());
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
             }
         }
 

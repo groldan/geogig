@@ -231,7 +231,7 @@ public abstract class ConflictsDatabaseConformanceTest<T extends ConflictsDataba
 
     private void testGetByPrefix(String namespace, String treePath, List<Conflict> expected) {
 
-        Iterator<Conflict> it = conflicts.getByPrefix(namespace, treePath);
+        Iterator<Conflict> it = conflicts.getByPrefix(namespace, treePath).iterator();
 
         Map<String, Conflict> actual = new TreeMap<>(Maps.uniqueIndex(it, (c) -> c.getPath()));
 

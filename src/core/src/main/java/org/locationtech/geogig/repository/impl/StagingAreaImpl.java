@@ -395,7 +395,7 @@ public class StagingAreaImpl implements StagingArea {
         return conflictsDatabase().getCountByPrefix(null, null);
     }
 
-    public @Override Iterator<Conflict> getConflicted(@Nullable String pathFilter) {
+    public @Override Stream<Conflict> getConflicted(@Nullable String pathFilter) {
         return conflictsDatabase().getByPrefix(null, pathFilter);
     }
 

@@ -19,6 +19,7 @@ import static org.junit.Assert.fail;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.junit.Test;
 import org.locationtech.geogig.feature.Feature;
@@ -41,8 +42,6 @@ import org.locationtech.geogig.porcelain.LogOp;
 import org.locationtech.geogig.porcelain.RevertConflictsException;
 import org.locationtech.geogig.porcelain.RevertOp;
 import org.locationtech.geogig.repository.Conflict;
-
-import com.google.common.collect.Lists;
 
 public class RevertOpTest extends RepositoryTestCase {
 
@@ -317,7 +316,8 @@ public class RevertOpTest extends RepositoryTestCase {
         assertTrue(ref.isPresent());
         assertEquals(c3.getId(), ref.get().getObjectId());
 
-        List<Conflict> conflicts = Lists.newArrayList(repo.command(ConflictsQueryOp.class).call());
+        List<Conflict> conflicts = repo.command(ConflictsQueryOp.class).call()
+                .collect(Collectors.toList());
         assertEquals(1, conflicts.size());
         String path = NodeRef.appendChild(pointsName, idP1);
         assertEquals(conflicts.get(0).getPath(), path);
@@ -379,7 +379,8 @@ public class RevertOpTest extends RepositoryTestCase {
         assertTrue(ref.isPresent());
         assertEquals(c3.getId(), ref.get().getObjectId());
 
-        List<Conflict> conflicts = Lists.newArrayList(repo.command(ConflictsQueryOp.class).call());
+        List<Conflict> conflicts = repo.command(ConflictsQueryOp.class).call()
+                .collect(Collectors.toList());
         assertEquals(1, conflicts.size());
         String path = NodeRef.appendChild(pointsName, idP1);
         assertEquals(conflicts.get(0).getPath(), path);

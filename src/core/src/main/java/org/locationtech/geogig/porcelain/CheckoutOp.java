@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.di.CanRunDuringConflict;
@@ -389,12 +390,11 @@ public class CheckoutOp extends AbstractGeoGigOp<CheckoutResult> {
 
     private CheckoutException buildConflictsException(final ConflictsDatabase conflictsDatabase) {
         final long conflictCount = conflictsDatabase.getCountByPrefix(null, null);
-        Iterator<Conflict> conflicts = Iterators
-                .limit(conflictsDatabase.getByPrefix(branchOrCommit, null), 25);
         StringBuilder msg = new StringBuilder();
-        while (conflicts.hasNext()) {
-            Conflict conflict = conflicts.next();
-            msg.append("error: ").append(conflict.getPath()).append(" needs merge.\n");
+        try (Stream<Conflict> conflicts = conflictsDatabase.getByPrefix(branchOrCommit, null)
+                .limit(25)) {
+            conflicts.map(Conflict::getPath)
+                    .forEach(path -> msg.append("error: ").append(path).append(" needs merge.\n"));
         }
         if (conflictCount > 25) {
             msg.append(String.format("and %,d more.\n", (conflictCount - 25)));

@@ -12,6 +12,7 @@ package org.locationtech.geogig.repository;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.DiffEntry;
@@ -104,6 +105,6 @@ public interface StagingArea {
      * @param pathFilter the path filter for the conflicts
      * @return the list of conflicts
      */
-    public Iterator<Conflict> getConflicted(final @Nullable String pathFilter);
+    public Stream<Conflict> getConflicted(final @Nullable String pathFilter);
 
 }

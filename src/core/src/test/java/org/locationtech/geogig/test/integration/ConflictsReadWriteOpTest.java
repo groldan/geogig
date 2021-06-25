@@ -13,6 +13,7 @@ import static org.junit.Assert.assertEquals;
 
 import java.util.ArrayList;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.junit.Test;
 import org.locationtech.geogig.model.impl.RevObjectTestSupport;
@@ -38,8 +39,8 @@ public class ConflictsReadWriteOpTest extends RepositoryTestCase {
         ArrayList<Conflict> conflicts = Lists.newArrayList(conflict, conflict2);
         repo.command(ConflictsWriteOp.class).setConflicts(conflicts).call();
 
-        Set<Conflict> returnedConflicts = Sets
-                .newHashSet(repo.command(ConflictsQueryOp.class).call());
+        Set<Conflict> returnedConflicts = repo.command(ConflictsQueryOp.class).call()
+                .collect(Collectors.toSet());
 
         assertEquals(Sets.newHashSet(conflicts), returnedConflicts);
     }

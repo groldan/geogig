@@ -13,6 +13,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.DiffEntry;
@@ -123,7 +124,7 @@ class TransactionStagingArea implements StagingArea {
      * @return the conflicts that match the path filter, if no path filter is specified, all
      *         conflicts will be returned
      */
-    public @Override Iterator<Conflict> getConflicted(@Nullable String pathFilter) {
+    public @Override Stream<Conflict> getConflicted(@Nullable String pathFilter) {
         return conflictsDb.getByPrefix(null, pathFilter);
     }
 

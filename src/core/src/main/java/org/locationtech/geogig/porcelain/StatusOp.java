@@ -9,8 +9,7 @@
  */
 package org.locationtech.geogig.porcelain;
 
-import java.util.Collections;
-import java.util.Iterator;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.di.CanRunDuringConflict;
@@ -35,13 +34,12 @@ public class StatusOp extends AbstractGeoGigOp<StatusOp.StatusSummary> {
 
         private static final Supplier<AutoCloseableIterator<DiffEntry>> empty;
 
-        private static final Supplier<Iterator<Conflict>> no_conflicts;
+        private static final Supplier<Stream<Conflict>> NO_CONFLICTS = () -> Stream.empty();
         static {
             empty = Suppliers.ofInstance(AutoCloseableIterator.emptyIterator());
-            no_conflicts = Suppliers.ofInstance(Collections.emptyIterator());
         }
 
-        private Supplier<Iterator<Conflict>> conflicts = no_conflicts;
+        private Supplier<Stream<Conflict>> conflicts = NO_CONFLICTS;
 
         private Supplier<AutoCloseableIterator<DiffEntry>> staged = empty;
 
@@ -51,7 +49,7 @@ public class StatusOp extends AbstractGeoGigOp<StatusOp.StatusSummary> {
 
         private long countConflicted;
 
-        public Supplier<Iterator<Conflict>> getConflicts() {
+        public Supplier<Stream<Conflict>> getConflicts() {
             return conflicts;
         }
 

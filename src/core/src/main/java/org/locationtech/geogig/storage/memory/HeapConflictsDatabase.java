@@ -9,12 +9,12 @@
  */
 package org.locationtech.geogig.storage.memory;
 
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.repository.Conflict;
@@ -116,14 +116,15 @@ public class HeapConflictsDatabase extends AbstractStore implements ConflictsDat
         return !map.isEmpty();
     }
 
-    public @Override Iterator<Conflict> getByPrefix(@Nullable String namespace,
+    public @Override Stream<Conflict> getByPrefix(@Nullable String namespace,
             @Nullable String prefixFilter) {
 
         ConcurrentHashMap<String, Conflict> map = get(namespace);
+
         Predicate<String> filter;
         filter = prefixFilter == null ? Predicates.alwaysTrue() : new PathFilter(prefixFilter);
 
-        return Maps.filterKeys(map, filter).values().iterator();
+        return Maps.filterKeys(map, filter).values().stream();
     }
 
     public @Override long getCountByPrefix(@Nullable String namespace, @Nullable String treePath) {
@@ -161,6 +162,6 @@ public class HeapConflictsDatabase extends AbstractStore implements ConflictsDat
 
     public @Override void removeByPrefix(@Nullable String namespace, @Nullable String pathPrefix) {
         ConcurrentHashMap<String, Conflict> map = get(namespace);
-        getByPrefix(namespace, pathPrefix).forEachRemaining(c -> map.remove(c.getPath()));
+        getByPrefix(namespace, pathPrefix).map(Conflict::getPath).forEach(map::remove);
     }
 }

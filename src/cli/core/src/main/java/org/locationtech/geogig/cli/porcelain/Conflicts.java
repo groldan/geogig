@@ -11,12 +11,14 @@ package org.locationtech.geogig.cli.porcelain;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 
 import org.locationtech.geogig.cli.AbstractCommand;
 import org.locationtech.geogig.cli.CLICommand;
+import org.locationtech.geogig.cli.CommandFailedException;
 import org.locationtech.geogig.cli.Console;
 import org.locationtech.geogig.cli.GeogigCLI;
 import org.locationtech.geogig.cli.annotation.ObjectDatabaseReadOnly;
@@ -78,25 +80,29 @@ public class Conflicts extends AbstractCommand implements CLICommand {
                 "Cannot use --ids-only and --refspecs-only at the same time");
 
         geogig = cli.getGeogig();
-        Iterator<Conflict> conflicts = geogig.command(ConflictsQueryOp.class).call();
-
-        if (!conflicts.hasNext()) {
-            cli.getConsole().println("No elements need merging.");
-            return;
-        }
-        while (conflicts.hasNext()) {
-            Conflict conflict = conflicts.next();
-            if (paths.isEmpty() || paths.contains(conflict.getPath())) {
-                if (previewDiff) {
-                    printConflictDiff(conflict, cli.getConsole(), geogig);
-                } else if (idsOnly) {
-                    cli.getConsole().println(conflict.toString());
-                } else if (refspecsOnly) {
-                    printRefspecs(conflict, cli.getConsole(), geogig);
-                } else {
-                    printConflict(conflict, cli.getConsole(), geogig);
+        final AtomicLong count = new AtomicLong();
+        try (Stream<Conflict> conflicts = geogig.command(ConflictsQueryOp.class).call()) {
+            conflicts.forEach(conflict -> {
+                try {
+                    if (paths.isEmpty() || paths.contains(conflict.getPath())) {
+                        if (previewDiff) {
+                            printConflictDiff(conflict, cli.getConsole(), geogig);
+                        } else if (idsOnly) {
+                            cli.getConsole().println(conflict.toString());
+                        } else if (refspecsOnly) {
+                            printRefspecs(conflict, cli.getConsole(), geogig);
+                        } else {
+                            printConflict(conflict, cli.getConsole(), geogig);
+                        }
+                        count.incrementAndGet();
+                    }
+                } catch (IOException e) {
+                    throw new CommandFailedException(e);
                 }
-            }
+            });
+        }
+        if (count.get() == 0) {
+            cli.getConsole().println("No elements need merging.");
         }
     }
 

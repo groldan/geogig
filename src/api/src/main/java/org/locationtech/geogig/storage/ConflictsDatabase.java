@@ -9,9 +9,9 @@
  */
 package org.locationtech.geogig.storage;
 
-import java.util.Iterator;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.repository.Conflict;
@@ -55,8 +55,7 @@ public interface ConflictsDatabase extends Store {
      *          {@code WHERE path = '<treePath>' OR path LIKE '<treePath>/%'} to account for
      *          conflicts to the tree itself as well as any of it's children.
      */
-    public Iterator<Conflict> getByPrefix(@Nullable String namespace,
-            @Nullable String prefixFilter);
+    public Stream<Conflict> getByPrefix(@Nullable String namespace, @Nullable String prefixFilter);
 
     /**
      * Gets the number of conflicts in the given path.

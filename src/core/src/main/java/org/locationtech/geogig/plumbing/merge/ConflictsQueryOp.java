@@ -9,8 +9,7 @@
  */
 package org.locationtech.geogig.plumbing.merge;
 
-import java.util.Collections;
-import java.util.Iterator;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.repository.Conflict;
@@ -23,16 +22,16 @@ import com.google.common.base.Supplier;
  * transaction space)
  * 
  */
-public class ConflictsQueryOp extends AbstractGeoGigOp<Iterator<Conflict>>
-        implements Supplier<Iterator<Conflict>> {
+public class ConflictsQueryOp extends AbstractGeoGigOp<Stream<Conflict>>
+        implements Supplier<Stream<Conflict>> {
 
     private String parentPathFilter = null;
 
-    protected @Override Iterator<Conflict> _call() {
+    protected @Override Stream<Conflict> _call() {
         if (repository().isOpen()) {
             return conflictsDatabase().getByPrefix(null, parentPathFilter);
         }
-        return Collections.emptyIterator();
+        return Stream.empty();
     }
 
     public ConflictsQueryOp setPrefixFilter(@Nullable String parentPath) {
@@ -40,7 +39,7 @@ public class ConflictsQueryOp extends AbstractGeoGigOp<Iterator<Conflict>>
         return this;
     }
 
-    public @Override Iterator<Conflict> get() {
+    public @Override Stream<Conflict> get() {
         return call();
     }
 }
