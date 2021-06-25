@@ -18,6 +18,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.ObjectId;
@@ -260,7 +261,7 @@ public abstract class AbstractObjectStore extends AbstractStore implements Objec
         putAll(objects, BulkOpListener.NOOP_LISTENER);
     }
 
-    public @Override void deleteAll(Iterator<ObjectId> ids) {
+    public @Override void deleteAll(Stream<ObjectId> ids) {
         checkOpen();
         deleteAll(ids, BulkOpListener.NOOP_LISTENER);
     }

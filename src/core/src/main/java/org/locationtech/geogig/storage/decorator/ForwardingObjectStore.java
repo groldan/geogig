@@ -11,6 +11,7 @@ package org.locationtech.geogig.storage.decorator;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Stream;
 
 import org.locationtech.geogig.model.NodeRef;
 import org.locationtech.geogig.model.ObjectId;
@@ -146,12 +147,12 @@ public class ForwardingObjectStore implements ObjectStore {
         actual.putAll(objects, listener);
     }
 
-    public @Override void deleteAll(Iterator<ObjectId> ids) {
+    public @Override void deleteAll(Stream<ObjectId> ids) {
         checkWritable();
         actual.deleteAll(ids);
     }
 
-    public @Override void deleteAll(Iterator<ObjectId> ids, BulkOpListener listener) {
+    public @Override void deleteAll(Stream<ObjectId> ids, BulkOpListener listener) {
         checkWritable();
         actual.deleteAll(ids, listener);
     }

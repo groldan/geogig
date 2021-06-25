@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.junit.After;
@@ -107,8 +108,8 @@ public abstract class ObjectStoreConformanceTest {
         db.close();
 
         checkClosed(() -> db.delete(ObjectId.NULL));
-        checkClosed(() -> db.deleteAll(emptyIterator()));
-        checkClosed(() -> db.deleteAll(emptyIterator(), NOOP_LISTENER));
+        checkClosed(() -> db.deleteAll(Stream.empty()));
+        checkClosed(() -> db.deleteAll(Stream.empty(), NOOP_LISTENER));
         checkClosed(() -> db.exists(RevTree.EMPTY_TREE_ID));
         checkClosed(() -> db.get(RevTree.EMPTY_TREE_ID));
         checkClosed(() -> db.get(RevTree.EMPTY_TREE_ID, RevTree.class));
@@ -128,7 +129,7 @@ public abstract class ObjectStoreConformanceTest {
         checkNullArgument(() -> db.delete(null));
         checkNullArgument(() -> db.deleteAll(null));
         checkNullArgument(() -> db.deleteAll(null, NOOP_LISTENER));
-        checkNullArgument(() -> db.deleteAll(emptyIterator(), null));
+        checkNullArgument(() -> db.deleteAll(Stream.empty(), null));
         checkNullArgument(() -> db.exists(null));
         checkNullArgument(() -> db.get(null));
         checkNullArgument(() -> db.get(null, RevTree.class));
@@ -179,7 +180,7 @@ public abstract class ObjectStoreConformanceTest {
         List<ObjectId> ids = Lists.newArrayList(concat(singletonIterator(notInDb1),
                 transform(objs.iterator(), RevObject::getId), singletonIterator(notInDb2)));
 
-        db.deleteAll(ids.iterator());
+        db.deleteAll(ids.stream());
         for (ObjectId id : ids) {
             assertFalse(db.exists(id));
         }
@@ -197,8 +198,8 @@ public abstract class ObjectStoreConformanceTest {
         ObjectId notInDb1 = RevObjectTestSupport.hashString("fake1");
         ObjectId notInDb2 = RevObjectTestSupport.hashString("fake2");
 
-        Iterator<ObjectId> ids = concat(singletonIterator(notInDb1),
-                transform(objs.iterator(), RevObject::getId), singletonIterator(notInDb2));
+        Stream<ObjectId> ids = Stream.concat(Stream.of(notInDb1),
+                Stream.concat(objs.stream().map(RevObject::getId), Stream.of(notInDb2)));
 
         CountingListener listener = BulkOpListener.newCountingListener();
         db.deleteAll(ids, listener);

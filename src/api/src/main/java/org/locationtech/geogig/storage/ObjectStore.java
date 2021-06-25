@@ -11,6 +11,7 @@ package org.locationtech.geogig.storage;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.DiffEntry;
@@ -217,10 +218,10 @@ public interface ObjectStore extends Store {
     public void putAll(Iterator<? extends RevObject> objects, BulkOpListener listener);
 
     /**
-     * Shorthand for {@link #deleteAll(Iterator, BulkOpListener)} with
+     * Shorthand for {@link #deleteAll(Stream, BulkOpListener)} with
      * {@link BulkOpListener#NOOP_LISTENER} as second argument
      */
-    public void deleteAll(Iterator<ObjectId> ids);
+    public void deleteAll(Stream<ObjectId> ids);
 
     /**
      * Requests to delete all objects in the argument list of object ids from the object database.
@@ -234,7 +235,7 @@ public interface ObjectStore extends Store {
      * @param ids the identifiers of objects to delete
      * @param listener a listener to receive notifications of deleted and not found objects
      */
-    public void deleteAll(Iterator<ObjectId> ids, BulkOpListener listener);
+    public void deleteAll(Stream<ObjectId> ids, BulkOpListener listener);
 
     @Beta
     public <T extends RevObject> AutoCloseableIterator<ObjectInfo<T>> getObjects(

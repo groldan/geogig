@@ -45,6 +45,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import org.eclipse.jdt.annotation.Nullable;
@@ -432,7 +433,7 @@ public class PGObjectStore extends AbstractStore implements ObjectStore {
         }
     }
 
-    public @Override void deleteAll(Iterator<ObjectId> ids) {
+    public @Override void deleteAll(Stream<ObjectId> ids) {
         deleteAll(ids, BulkOpListener.NOOP_LISTENER);
     }
 
@@ -826,9 +827,8 @@ public class PGObjectStore extends AbstractStore implements ObjectStore {
     /**
      * Override to optimize batch delete.
      */
-    public @Override void deleteAll(final Iterator<ObjectId> ids, final BulkOpListener listener) {
-        checkNotNull(ids, "argument objectId is null");
-        checkNotNull(listener, "argument listener is null");
+    public @Override void deleteAll(@NonNull Stream<ObjectId> ids,
+            @NonNull BulkOpListener listener) {
         checkWritable();
         env.checkRepositoryExists();
 
@@ -839,7 +839,7 @@ public class PGObjectStore extends AbstractStore implements ObjectStore {
             cx.setAutoCommit(false);
             try (PreparedStatement stmt = cx.prepareStatement(log(sql, LOG))) {
                 // partition the objects into chunks for batch processing
-                Iterator<List<ObjectId>> it = Iterators.partition(ids, putAllBatchSize);
+                Iterator<List<ObjectId>> it = Iterators.partition(ids.iterator(), putAllBatchSize);
                 while (it.hasNext()) {
                     List<ObjectId> list = it.next();
                     for (ObjectId id : list) {

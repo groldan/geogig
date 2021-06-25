@@ -173,24 +173,22 @@ public class HeapObjectStore extends AbstractStore implements ObjectStore {
         });
     }
 
-    public @Override void deleteAll(Iterator<ObjectId> ids) {
+    public @Override void deleteAll(Stream<ObjectId> ids) {
         deleteAll(ids, NOOP_LISTENER);
     }
 
-    public @Override void deleteAll(Iterator<ObjectId> ids, final BulkOpListener listener) {
-        checkNotNull(ids, "ids is null");
-        checkNotNull(listener, "listener is null");
+    public @Override void deleteAll(@NonNull Stream<ObjectId> ids,
+            @NonNull BulkOpListener listener) {
         checkState(isOpen(), "db is closed");
 
-        while (ids.hasNext()) {
-            ObjectId id = ids.next();
+        ids.forEach(id -> {
             RevObject removed = this.objects.remove(id);
             if (removed == null) {
                 listener.notFound(id);
             } else {
                 listener.deleted(id);
             }
-        }
+        });
     }
 
     public @Override Iterator<RevObject> getAll(Iterable<ObjectId> ids) {

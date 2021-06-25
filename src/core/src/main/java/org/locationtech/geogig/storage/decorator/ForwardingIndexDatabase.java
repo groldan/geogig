@@ -13,6 +13,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.DiffEntry;
@@ -188,11 +189,11 @@ public @RequiredArgsConstructor class ForwardingIndexDatabase implements IndexDa
         actual.putAll(objects, listener);
     }
 
-    public @Override void deleteAll(Iterator<ObjectId> ids) {
+    public @Override void deleteAll(Stream<ObjectId> ids) {
         actual.deleteAll(ids);
     }
 
-    public @Override void deleteAll(Iterator<ObjectId> ids, BulkOpListener listener) {
+    public @Override void deleteAll(Stream<ObjectId> ids, BulkOpListener listener) {
         actual.deleteAll(ids, listener);
     }
 

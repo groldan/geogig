@@ -245,9 +245,8 @@ public class RocksdbObjectStore extends AbstractObjectStore implements ObjectSto
         };
     }
 
-    public @Override void deleteAll(Iterator<ObjectId> ids, BulkOpListener listener) {
-        checkNotNull(ids, "argument objectId is null");
-        checkNotNull(listener, "argument listener is null");
+    public @Override void deleteAll(@NonNull Stream<ObjectId> ids,
+            @NonNull BulkOpListener listener) {
         checkWritable();
 
         final boolean checkExists = !BulkOpListener.NOOP_LISTENER.equals(listener);
@@ -260,19 +259,24 @@ public class RocksdbObjectStore extends AbstractObjectStore implements ObjectSto
             try (WriteOptions writeOps = new WriteOptions(); //
                     WriteBatch batch = new WriteBatch()) {
                 writeOps.setSync(true);
-                while (ids.hasNext()) {
-                    ObjectId id = ids.next();
+                ids.forEach(id -> {
                     id.getRawValue(keybuff);
                     if (!checkExists || exists(dbRef, ro, keybuff)) {
-                        batch.delete(keybuff);
+                        try {
+                            batch.delete(keybuff);
+                        } catch (RocksDBException e) {
+                            throw new RuntimeException(e);
+                        }
                         listener.deleted(id);
                     } else {
                         listener.notFound(id);
                     }
+                });
+                try {
+                    dbRef.db().write(writeOps, batch);
+                } catch (RocksDBException e) {
+                    throw new RuntimeException(e);
                 }
-                dbRef.db().write(writeOps, batch);
-            } catch (RocksDBException e) {
-                throw new RuntimeException(e);
             }
         }
     }
