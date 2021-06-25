@@ -119,7 +119,7 @@ public @Slf4j @UtilityClass class DAGTreeBuilder {
             cacheLock.writeLock().lock();
             try {
                 if (!isCancelled() && newTrees.size() >= minSize) {
-                    targetStore.putAll(newTrees.values().iterator());
+                    targetStore.putAll(newTrees.values().stream());
                     newTrees.clear();
                 }
             } finally {

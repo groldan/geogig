@@ -14,7 +14,6 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Lists.newArrayList;
-import static org.locationtech.geogig.storage.BulkOpListener.NOOP_LISTENER;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -138,7 +137,7 @@ public class PreparePackOp extends AbstractGeoGigOp<Pack> {
     private Set<RevTag> resolveWantTags(List<RefRequest> tagRequests) {
         Iterable<ObjectId> ids = transform(tagRequests, r -> r.want);
 
-        Iterator<RevTag> tags = objectDatabase().getAll(ids, NOOP_LISTENER, RevTag.class);
+        Iterator<RevTag> tags = objectDatabase().getAll(ids, RevTag.class);
 
         return Sets.newHashSet(tags);
     }
@@ -149,7 +148,7 @@ public class PreparePackOp extends AbstractGeoGigOp<Pack> {
         List<ObjectId> ids = refs.stream().filter(filter).map(function)
                 .collect(Collectors.toList());
         if (isTags) {
-            Iterator<RevTag> tags = objectDatabase().getAll(ids, NOOP_LISTENER, RevTag.class);
+            Iterator<RevTag> tags = objectDatabase().getAll(ids, RevTag.class);
             ids = newArrayList(Iterators.transform(tags, RevTag::getCommitId));
         }
         return Sets.newHashSet(ids);

@@ -164,7 +164,7 @@ public @RequiredArgsConstructor class ForwardingIndexDatabase implements IndexDa
         actual.delete(objectId);
     }
 
-    public @Override Iterator<RevObject> getAll(Iterable<ObjectId> ids) {
+    public @Override Stream<RevObject> getAll(Stream<ObjectId> ids) {
         return actual.getAll(ids);
     }
 
@@ -172,20 +172,20 @@ public @RequiredArgsConstructor class ForwardingIndexDatabase implements IndexDa
         actual.copyIndexTo(index, target);
     }
 
-    public @Override Iterator<RevObject> getAll(Iterable<ObjectId> ids, BulkOpListener listener) {
+    public @Override Stream<RevObject> getAll(Stream<ObjectId> ids, BulkOpListener listener) {
         return actual.getAll(ids, listener);
     }
 
-    public @Override <T extends RevObject> Iterator<T> getAll(Iterable<ObjectId> ids,
+    public @Override <T extends RevObject> Stream<T> getAll(Stream<ObjectId> ids,
             BulkOpListener listener, Class<T> type) {
         return actual.getAll(ids, listener, type);
     }
 
-    public @Override void putAll(Iterator<? extends RevObject> objects) {
+    public @Override void putAll(Stream<? extends RevObject> objects) {
         actual.putAll(objects);
     }
 
-    public @Override void putAll(Iterator<? extends RevObject> objects, BulkOpListener listener) {
+    public @Override void putAll(Stream<? extends RevObject> objects, BulkOpListener listener) {
         actual.putAll(objects, listener);
     }
 

@@ -33,7 +33,6 @@ import org.locationtech.geogig.model.RevTree;
 import org.locationtech.geogig.model.RevTreeBuilder;
 import org.locationtech.geogig.plumbing.HashObject;
 import org.locationtech.geogig.repository.Platform;
-import org.locationtech.geogig.storage.BulkOpListener;
 import org.locationtech.geogig.storage.ObjectStore;
 import org.locationtech.jts.geom.Envelope;
 
@@ -228,8 +227,7 @@ public class RevObjectTestSupport {
             nodes.addAll(tree.trees());
         } else {
             Iterable<ObjectId> ids = Iterables.transform(tree.getBuckets(), Bucket::getObjectId);
-            Iterator<RevTree> buckets = source.getAll(ids, BulkOpListener.NOOP_LISTENER,
-                    RevTree.class);
+            Iterator<RevTree> buckets = source.getAll(ids, RevTree.class);
             while (buckets.hasNext()) {
                 nodes.addAll(getTreeNodes(buckets.next(), source));
             }
@@ -249,8 +247,7 @@ public class RevObjectTestSupport {
         if (tree.bucketsSize() > 0) {
             Iterable<ObjectId> ids = Iterables.transform(tree.getBuckets(), Bucket::getObjectId);
 
-            List<RevTree> buckets = Lists
-                    .newArrayList(source.getAll(ids, BulkOpListener.NOOP_LISTENER, RevTree.class));
+            List<RevTree> buckets = Lists.newArrayList(source.getAll(ids, RevTree.class));
             trees.addAll(buckets);
             for (RevTree bucket : buckets) {
                 trees.addAll(getAllTrees(source, bucket));

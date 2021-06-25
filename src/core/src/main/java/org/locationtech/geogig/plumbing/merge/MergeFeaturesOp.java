@@ -88,7 +88,7 @@ public class MergeFeaturesOp extends AbstractGeoGigOp<Feature> {
         final ObjectId featureBId = nodeRefB.getObjectId();
         Iterable<ObjectId> ids = ImmutableList.of(metadataId, ancestorFeatureId, featureAId,
                 featureBId);
-        Iterator<RevObject> objsit = objectDatabase().getAll(ids, BulkOpListener.NOOP_LISTENER);
+        Iterator<RevObject> objsit = objectDatabase().getAll(ids);
         ImmutableMap<ObjectId, RevObject> map = Maps.uniqueIndex(objsit, RevObject::getId);
         checkState(map.containsKey(metadataId), "Invalid reference: %s", metadataId);
         checkState(map.containsKey(ancestorFeatureId), "Invalid reference: %s", ancestorFeatureId);

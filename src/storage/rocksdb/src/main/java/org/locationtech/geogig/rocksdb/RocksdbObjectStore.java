@@ -9,12 +9,6 @@
  */
 package org.locationtech.geogig.rocksdb;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static java.util.Spliterator.DISTINCT;
-import static java.util.Spliterator.IMMUTABLE;
-import static java.util.Spliterator.NONNULL;
-import static java.util.Spliterators.spliteratorUnknownSize;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -27,10 +21,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.NodeRef;
@@ -57,7 +51,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
-import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterators;
 
@@ -161,9 +154,8 @@ public class RocksdbObjectStore extends AbstractObjectStore implements ObjectSto
         }
     }
 
-    public @Override boolean exists(ObjectId id) {
+    public @Override boolean exists(@NonNull ObjectId id) {
         checkOpen();
-        checkNotNull(id, "argument id is null");
 
         try (RocksDBReference dbRef = dbhandle.getReference()) {
             return exists(dbRef, bulkReadOptions, id.getRawValue());
@@ -181,8 +173,7 @@ public class RocksdbObjectStore extends AbstractObjectStore implements ObjectSto
         }
     }
 
-    public @Override void delete(ObjectId objectId) {
-        checkNotNull(objectId, "argument objectId is null");
+    public @Override void delete(@NonNull ObjectId objectId) {
         checkWritable();
         byte[] key = objectId.getRawValue();
         try (RocksDBReference dbRef = dbhandle.getReference()) {
@@ -192,57 +183,53 @@ public class RocksdbObjectStore extends AbstractObjectStore implements ObjectSto
         }
     }
 
-    public @Override Iterator<RevObject> getAll(final Iterable<ObjectId> ids,
-            final BulkOpListener listener) {
-        return getAll(ids, listener, RevObject.class);
-    }
+    public @Override <T extends RevObject> Stream<T> getAll(//
+            @NonNull Stream<ObjectId> ids, //
+            @NonNull BulkOpListener listener, //
+            @NonNull Class<T> type) {
 
-    public @Override <T extends RevObject> Iterator<T> getAll(final Iterable<ObjectId> ids,
-            final BulkOpListener listener, final Class<T> type) {
-        checkNotNull(ids, "ids is null");
-        checkNotNull(listener, "listener is null");
-        checkNotNull(type, "type is null");
         checkOpen();
 
-        return new AbstractIterator<T>() {
+        // REVISIT: if ids.isParallel(), race condition on keybuff/valueBuff
+        final RocksDBReference dbRef = dbhandle.getReference();
+        final byte[] keybuff = new byte[ObjectId.NUM_BYTES];
+        final byte[] valueBuff = new byte[64 * 1024];
 
-            private Iterator<ObjectId> oids = ids.iterator();
+        Stream<T> objects = ids.map(id -> find(id, dbRef, listener, type, keybuff, valueBuff));
+        return objects.filter(Objects::nonNull).onClose(dbRef::close);
+    }
 
-            private byte[] keybuff = new byte[ObjectId.NUM_BYTES];
+    private <T extends RevObject> T find(//
+            ObjectId id, //
+            RocksDBReference dbRef, //
+            BulkOpListener listener, //
+            Class<T> type, //
+            byte[] keybuff, //
+            byte[] valueBuff) {
 
-            private byte[] valueBuff = new byte[64 * 1024];
+        checkOpen();
 
-            private ReadOptions readOps = bulkReadOptions;
+        final ReadOptions readOps = this.bulkReadOptions;
 
-            protected @Override T computeNext() {
-                checkOpen();
-                try (RocksDBReference dbRef = dbhandle.getReference()) {
-                    while (oids.hasNext()) {
-                        ObjectId id = oids.next();
-                        id.getRawValue(keybuff);
-                        final int size = dbRef.db().get(readOps, keybuff, valueBuff);
-                        if (RocksDB.NOT_FOUND == size) {
-                            listener.notFound(id);
-                            continue;
-                        }
-                        if (size > valueBuff.length) {
-                            valueBuff = dbRef.db().get(readOps, keybuff);
-                        }
-                        RevObject object;
-                        object = serializer().read(id, valueBuff, 0, size);
-                        if (type.isInstance(object)) {
-                            listener.found(id, Integer.valueOf(size));
-                            return type.cast(object);
-                        } else {
-                            listener.notFound(id);
-                        }
-                    }
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
+        id.getRawValue(keybuff);
+        try {
+            int size = dbRef.db().get(readOps, keybuff, valueBuff);
+            if (RocksDB.NOT_FOUND != size) {
+                if (size > valueBuff.length) {
+                    valueBuff = dbRef.db().get(readOps, keybuff);
                 }
-                return endOfData();
+                RevObject object = serializer().read(id, valueBuff, 0, size);
+                if (type.isInstance(object)) {
+                    listener.found(id, Integer.valueOf(size));
+                    return type.cast(object);
+                }
             }
-        };
+        } catch (RocksDBException | IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        listener.notFound(id);
+        return null;
     }
 
     public @Override void deleteAll(@NonNull Stream<ObjectId> ids,
@@ -317,26 +304,16 @@ public class RocksdbObjectStore extends AbstractObjectStore implements ObjectSto
         }
     }
 
-    /**
-     * Creates a parallel stream out of {@code objects}, filtering out before encoding through
-     * {@link #exists} if {@code checkExists == true}
-     */
-    protected Stream<RevObject> toStream(Iterator<? extends RevObject> objects, boolean checkExists,
+    protected Stream<? extends RevObject> ignoreExisting(Stream<? extends RevObject> stream,
             BulkOpListener listener) {
 
-        final int characteristics = IMMUTABLE | NONNULL | DISTINCT;
-        Stream<RevObject> stream;
-        stream = StreamSupport.stream(spliteratorUnknownSize(objects, characteristics), true);
-        if (checkExists) {
-            stream = stream.filter((o) -> {
-                if (exists(o.getId())) {
-                    listener.found(o.getId(), null);
-                    return false;
-                }
-                return true;
-            });
-        }
-        return stream;
+        return stream.filter(o -> {
+            boolean exists = exists(o.getId());
+            if (exists) {
+                listener.found(o.getId(), null);
+            }
+            return !exists;
+        });
     }
 
     private EncodedObject encode(RevObject o) {
@@ -349,23 +326,20 @@ public class RocksdbObjectStore extends AbstractObjectStore implements ObjectSto
         return new EncodedObject(o.getId(), o.getType(), out.toByteArray());
     }
 
-    public @Override final void putAll(Iterator<? extends RevObject> objects,
-            final BulkOpListener listener) {
-        checkNotNull(objects, "objects is null");
-        checkNotNull(listener, "listener is null");
+    public @Override void putAll(@NonNull Stream<? extends RevObject> objects,
+            @NonNull BulkOpListener listener) {
         checkWritable();
 
         final boolean checkExists = !BulkOpListener.NOOP_LISTENER.equals(listener);
-        Stream<RevObject> stream = toStream(objects, checkExists, listener);
-        putAll(stream, listener);
-    }
+        if (checkExists) {
+            objects = ignoreExisting(objects, listener);
+        }
 
-    protected void putAll(Stream<RevObject> stream, BulkOpListener listener) {
         final Stopwatch sw = LOG.isTraceEnabled() ? Stopwatch.createStarted() : null;
 
         final int batchsize = 1000;
         // encodes on several threads
-        Stream<EncodedObject> encoded = stream.parallel().map(o -> encode(o));
+        Stream<EncodedObject> encoded = objects.parallel().map(o -> encode(o));
 
         int insertCount = 0;
         final Iterator<EncodedObject> iterator = encoded.iterator();
@@ -409,11 +383,9 @@ public class RocksdbObjectStore extends AbstractObjectStore implements ObjectSto
     }
 
     public @Override <T extends RevObject> AutoCloseableIterator<ObjectInfo<T>> getObjects(
-            Iterator<NodeRef> refs, BulkOpListener listener, Class<T> type) {
+            @NonNull Iterator<NodeRef> refs, @NonNull BulkOpListener listener,
+            @NonNull Class<T> type) {
 
-        checkNotNull(refs, "refs is null");
-        checkNotNull(listener, "listener is null");
-        checkNotNull(type, "type is null");
         checkOpen();
 
         return new AutoCloseableIterator<ObjectInfo<T>>() {

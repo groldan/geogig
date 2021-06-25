@@ -15,7 +15,6 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Sets.newTreeSet;
 import static org.locationtech.geogig.model.RevTree.EMPTY;
-import static org.locationtech.geogig.storage.BulkOpListener.NOOP_LISTENER;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -544,18 +543,15 @@ public class PreOrderDiffWalk {
             // get all buckets at once, to leverage ObjectStore optimizations
             if (info.left.source == info.right.source) {
                 Set<ObjectId> ids = Sets.union(lbucketIds, rbucketIds);
-                Iterator<RevTree> titer = info.left.source.getAll(ids, NOOP_LISTENER,
-                        RevTree.class);
+                Iterator<RevTree> titer = info.left.source.getAll(ids, RevTree.class);
                 trees = Streams.stream(titer).collect(Collectors.toMap(t -> t.getId(), t -> t));
             } else {
-                trees = Streams
-                        .stream(info.left.source.getAll(lbucketIds, NOOP_LISTENER, RevTree.class))
+                trees = Streams.stream(info.left.source.getAll(lbucketIds, RevTree.class))
                         .collect(Collectors.toMap(t -> t.getId(), t -> t));
 
                 // avoid re-fetching objects at both sides
                 Set<ObjectId> missingAtRight = Sets.difference(rbucketIds, lbucketIds);
-                trees.putAll(Streams.stream(
-                        info.right.source.getAll(missingAtRight, NOOP_LISTENER, RevTree.class))
+                trees.putAll(Streams.stream(info.right.source.getAll(missingAtRight, RevTree.class))
                         .collect(Collectors.toMap(t -> t.getId(), t -> t)));
 
             }
@@ -675,7 +671,7 @@ public class PreOrderDiffWalk {
             final Map<ObjectId, RevTree> bucketTrees;
             {
                 Iterable<ObjectId> ids = transform(buckets.values(), Bucket::getObjectId);
-                bucketTrees = Streams.stream(source.getAll(ids, NOOP_LISTENER, RevTree.class))
+                bucketTrees = Streams.stream(source.getAll(ids, RevTree.class))
                         .collect(Collectors.toMap(t -> t.getId(), t -> t));
             }
             return bucketTrees;

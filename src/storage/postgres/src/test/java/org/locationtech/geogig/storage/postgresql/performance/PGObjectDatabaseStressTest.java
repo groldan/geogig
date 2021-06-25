@@ -21,6 +21,7 @@ import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.junit.After;
@@ -270,8 +271,6 @@ public class PGObjectDatabaseStressTest {
 
         Iterator<ObjectInfo<RevFeature>> iterator = db.getObjects(refs, listener, RevFeature.class);
         final int returnedObjectCount = Iterators.size(iterator);
-
-        sw.stop();
 
         System.err.printf("----- %,d Features queried (%,d not found) with getObjects() in %,dms\n",
                 listener.found(), listener.notFound(), sw.elapsed(TimeUnit.MILLISECONDS));

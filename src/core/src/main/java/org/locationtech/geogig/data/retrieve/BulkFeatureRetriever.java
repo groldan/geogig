@@ -76,7 +76,7 @@ public class BulkFeatureRetriever {
         AutoCloseableIterator<ObjectInfo<RevFeature>> objects;
 
         AutoCloseableIterator<NodeRef> closeableRefs = AutoCloseableIterator.fromIterator(refs);
-        objects = odb.getObjects(closeableRefs, BulkOpListener.NOOP_LISTENER, RevFeature.class);
+        objects = odb.getObjects(closeableRefs, RevFeature.class);
 
         return new AutoCloseableIterator<ObjectInfo<RevFeature>>() {
 

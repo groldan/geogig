@@ -113,15 +113,15 @@ public abstract class ObjectStoreConformanceTest {
         checkClosed(() -> db.exists(RevTree.EMPTY_TREE_ID));
         checkClosed(() -> db.get(RevTree.EMPTY_TREE_ID));
         checkClosed(() -> db.get(RevTree.EMPTY_TREE_ID, RevTree.class));
-        checkClosed(() -> db.getAll(Collections.emptyList()));
-        checkClosed(() -> db.getAll(Collections.emptyList(), NOOP_LISTENER));
-        checkClosed(() -> db.getAll(Collections.emptyList(), NOOP_LISTENER, RevTree.class));
+        checkClosed(() -> db.getAll(Stream.empty()));
+        checkClosed(() -> db.getAll(Stream.empty(), NOOP_LISTENER));
+        checkClosed(() -> db.getAll(Stream.empty(), NOOP_LISTENER, RevTree.class));
         checkClosed(() -> db.getIfPresent(ObjectId.NULL));
         checkClosed(() -> db.getIfPresent(RevTree.EMPTY_TREE_ID, RevTree.class));
         checkClosed(() -> db.lookUp("abcd1234"));
         checkClosed(() -> db.put(RevTree.EMPTY));
-        checkClosed(() -> db.putAll(emptyIterator()));
-        checkClosed(() -> db.putAll(emptyIterator(), NOOP_LISTENER));
+        checkClosed(() -> db.putAll(Stream.empty()));
+        checkClosed(() -> db.putAll(Stream.empty(), NOOP_LISTENER));
     }
 
     @Test
@@ -136,8 +136,8 @@ public abstract class ObjectStoreConformanceTest {
         checkNullArgument(() -> db.get(RevTree.EMPTY_TREE_ID, null));
         checkNullArgument(() -> db.getAll(null));
         checkNullArgument(() -> db.getAll(null, NOOP_LISTENER));
-        checkNullArgument(() -> db.getAll(Collections.emptyList(), NOOP_LISTENER, null));
-        checkNullArgument(() -> db.getAll(Collections.emptyList(), null));
+        checkNullArgument(() -> db.getAll(Stream.empty(), NOOP_LISTENER, null));
+        checkNullArgument(() -> db.getAll(Stream.empty(), (BulkOpListener) null));
         checkNullArgument(() -> db.getIfPresent(null));
         checkNullArgument(() -> db.getIfPresent(null, RevTree.class));
         checkNullArgument(() -> db.getIfPresent(RevTree.EMPTY_TREE_ID, null));
@@ -145,7 +145,7 @@ public abstract class ObjectStoreConformanceTest {
         checkNullArgument(() -> db.put(null));
         checkNullArgument(() -> db.putAll(null));
         checkNullArgument(() -> db.putAll(null, NOOP_LISTENER));
-        checkNullArgument(() -> db.putAll(emptyIterator(), null));
+        checkNullArgument(() -> db.putAll(Stream.empty(), null));
     }
 
     private void checkClosed(Runnable op) {

@@ -10,12 +10,8 @@
 package org.locationtech.geogig.storage.postgresql.v9;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.format;
-import static java.util.Spliterator.DISTINCT;
-import static java.util.Spliterator.IMMUTABLE;
-import static java.util.Spliterator.NONNULL;
 import static org.locationtech.geogig.storage.postgresql.config.Environment.KEY_GETALL_BATCH_SIZE;
 import static org.locationtech.geogig.storage.postgresql.config.Environment.KEY_PUTALL_BATCH_SIZE;
 import static org.locationtech.geogig.storage.postgresql.config.Environment.KEY_THREADPOOL_SIZE;
@@ -35,9 +31,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.Spliterator;
-import java.util.Spliterators;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -46,7 +41,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.NodeRef;
@@ -80,6 +74,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Iterators;
+import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
@@ -116,7 +111,7 @@ public class PGObjectStore extends AbstractStore implements ObjectStore {
 
     public PGObjectStore(final @NonNull ConfigDatabase configdb, final @NonNull Environment env) {
         super(env.isReadOnly());
-        Preconditions.checkNotNull(env.getRepositoryName(), "Repository name not set");
+        Objects.requireNonNull(env.getRepositoryName(), "Repository name not set");
         this.configdb = configdb;
         this.env = env;
     }
@@ -201,8 +196,7 @@ public class PGObjectStore extends AbstractStore implements ObjectStore {
         return env.getTables().objects();
     }
 
-    public @Override boolean exists(final ObjectId id) {
-        checkNotNull(id, "argument id is null");
+    public @Override boolean exists(@NonNull ObjectId id) {
         checkState(isOpen(), "Database is closed");
         env.checkRepositoryExists();
         if (sharedCache.contains(id)) {
@@ -226,8 +220,7 @@ public class PGObjectStore extends AbstractStore implements ObjectStore {
         }
     }
 
-    public @Override List<ObjectId> lookUp(final String partialId) {
-        checkNotNull(partialId, "argument partialId is null");
+    public @Override List<ObjectId> lookUp(@NonNull String partialId) {
         checkArgument(partialId.length() > 7, "partial id must be at least 8 characters long: ",
                 partialId);
         checkState(isOpen(), "db is closed");
@@ -260,23 +253,8 @@ public class PGObjectStore extends AbstractStore implements ObjectStore {
         }
     }
 
-    public @Override RevObject get(ObjectId id) throws IllegalArgumentException {
-        checkNotNull(id, "argument id is null");
-        checkState(isOpen(), "db is closed");
-
-        env.checkRepositoryExists();
-        RevObject obj = getIfPresent(id);
-        if (obj == null) {
-            throw new IllegalArgumentException("Object does not exist: " + id);
-        }
-
-        return obj;
-    }
-
-    public @Override <T extends RevObject> T get(ObjectId id, Class<T> type)
+    public @Override <T extends RevObject> T get(@NonNull ObjectId id, @NonNull Class<T> type)
             throws IllegalArgumentException {
-        checkNotNull(id, "argument id is null");
-        checkNotNull(type, "argument class is null");
         checkState(isOpen(), "db is closed");
 
         env.checkRepositoryExists();
@@ -287,18 +265,15 @@ public class PGObjectStore extends AbstractStore implements ObjectStore {
         return type.cast(obj);
     }
 
-    public @Override RevObject getIfPresent(ObjectId id) {
-        checkNotNull(id, "argument id is null");
+    public @Override RevObject getIfPresent(@NonNull ObjectId id) {
         checkState(isOpen(), "db is closed");
         env.checkRepositoryExists();
         return getIfPresent(id, RevObject.class);
     }
 
-    public @Override <T extends RevObject> T getIfPresent(final ObjectId id, final Class<T> type)
-            throws IllegalArgumentException {
+    public @Override <T extends RevObject> T getIfPresent(@NonNull ObjectId id,
+            @NonNull Class<T> type) throws IllegalArgumentException {
 
-        checkNotNull(id, "argument id is null");
-        checkNotNull(type, "argument class is null");
         checkState(isOpen(), "db is closed");
         env.checkRepositoryExists();
 
@@ -346,35 +321,21 @@ public class PGObjectStore extends AbstractStore implements ObjectStore {
         return get(id, RevTag.class);
     }
 
-    public @Override Iterator<RevObject> getAll(Iterable<ObjectId> ids) {
-        return getAll(ids, BulkOpListener.NOOP_LISTENER);
-    }
-
-    public @Override Iterator<RevObject> getAll(final Iterable<ObjectId> ids,
-            final BulkOpListener listener) {
-        return getAll(ids, listener, RevObject.class);
-    }
-
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    public @Override <T extends RevObject> Iterator<T> getAll(Iterable<ObjectId> ids,
-            BulkOpListener listener, Class<T> type) {
+    public @Override <T extends RevObject> Stream<T> getAll(@NonNull Stream<ObjectId> ids,
+            @NonNull BulkOpListener listener, @NonNull Class<T> type) {
 
-        checkNotNull(ids, "ids is null");
-        checkNotNull(listener, "listener is null");
-        checkNotNull(type, "type is null");
         checkState(isOpen(), "Database is closed");
         env.checkRepositoryExists();
 
-        Iterator<T> stream = new PGObjectStoreGetAllIterator(ids.iterator(), type, listener, this);
-
-        return stream;
+        Iterator<T> iterator = new PGObjectStoreGetAllIterator(ids.iterator(), type, listener,
+                this);
+        return Streams.stream(iterator);
     }
 
     public @Override <T extends RevObject> AutoCloseableIterator<ObjectInfo<T>> getObjects(
-            Iterator<NodeRef> refs, BulkOpListener listener, Class<T> type) {
-        checkNotNull(refs, "refs is null");
-        checkNotNull(listener, "listener is null");
-        checkNotNull(type, "type is null");
+            @NonNull Iterator<NodeRef> refs, @NonNull BulkOpListener listener,
+            @NonNull Class<T> type) {
         checkState(isOpen(), "Database is closed");
         env.checkRepositoryExists();
 
@@ -384,8 +345,7 @@ public class PGObjectStore extends AbstractStore implements ObjectStore {
         return stream;
     }
 
-    public @Override boolean put(final RevObject object) {
-        checkNotNull(object, "argument object is null");
+    public @Override boolean put(@NonNull RevObject object) {
         checkArgument(!object.getId().isNull(), "ObjectId is NULL %s", object);
         checkWritable();
         env.checkRepositoryExists();
@@ -411,12 +371,7 @@ public class PGObjectStore extends AbstractStore implements ObjectStore {
         }
     }
 
-    public @Override void putAll(Iterator<? extends RevObject> objects) {
-        putAll(objects, BulkOpListener.NOOP_LISTENER);
-    }
-
-    public @Override void delete(ObjectId objectId) {
-        checkNotNull(objectId, "argument objectId is null");
+    public @Override void delete(@NonNull ObjectId objectId) {
         checkWritable();
         env.checkRepositoryExists();
 
@@ -431,10 +386,6 @@ public class PGObjectStore extends AbstractStore implements ObjectStore {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public @Override void deleteAll(Stream<ObjectId> ids) {
-        deleteAll(ids, BulkOpListener.NOOP_LISTENER);
     }
 
     protected String tableNameForType(/* @Nullable */ RevObject.TYPE type, @Nullable PGId pgid) {
@@ -730,26 +681,12 @@ public class PGObjectStore extends AbstractStore implements ObjectStore {
     /**
      * Override to optimize batch insert.
      */
-    public @Override void putAll(final Iterator<? extends RevObject> objects,
-            final BulkOpListener listener) {
-        checkNotNull(objects, "objects is null");
-        checkNotNull(listener, "listener is null");
+    public @Override void putAll(@NonNull Stream<? extends RevObject> objects,
+            @NonNull BulkOpListener listener) {
         checkWritable();
         env.checkRepositoryExists();
 
-        Iterator<EncodedObject> encoded;
-        {
-            // let the RevObjects be encoded in several threads and then joint on a single iterator
-            // of EncodedObject
-            final int characteristics = IMMUTABLE | NONNULL | DISTINCT;
-
-            Spliterator<? extends RevObject> spliterator = Spliterators
-                    .spliteratorUnknownSize(objects, characteristics);
-
-            final boolean parallel = true;
-            encoded = StreamSupport.stream(spliterator, parallel).map((obj) -> encode(obj))
-                    .iterator();
-        }
+        final Iterator<EncodedObject> encoded = objects.map(this::encode).iterator();
 
         final int maxTasks = Math.min(Runtime.getRuntime().availableProcessors(),
                 resources.threadPoolSize());

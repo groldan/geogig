@@ -401,7 +401,7 @@ public class CloneOpTest extends RemoteRepositoryTestCase {
         assertEquals(expected, logged);
 
         // Make sure the remote has all of the tags
-        ImmutableList<RevTag> remoteTags = remoteRepo.command(TagListOp.class).call();
+        List<RevTag> remoteTags = remoteRepo.command(TagListOp.class).call();
         assertEquals(tags.size(), remoteTags.size());
         for (RevTag tag : tags) {
             assertTrue(remoteTags.contains(tag));

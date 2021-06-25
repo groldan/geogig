@@ -9,6 +9,8 @@
  */
 package org.locationtech.geogig.storage;
 
+import static org.locationtech.geogig.storage.BulkOpListener.NOOP_LISTENER;
+
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Stream;
@@ -57,7 +59,9 @@ public interface ObjectStore extends Store {
      * @return the revision object
      * @throws IllegalArgumentException if no blob exists for the given {@code id}
      */
-    public RevObject get(ObjectId id) throws IllegalArgumentException;
+    default RevObject get(ObjectId id) throws IllegalArgumentException {
+        return get(id, RevObject.class);
+    }
 
     /**
      * Reads an object with the given {@link ObjectId id} out of the database.
@@ -92,27 +96,37 @@ public interface ObjectStore extends Store {
     /**
      * Shortcut for {@link #get(ObjectId, Class) get(id, RevTree.class)}
      */
-    public RevTree getTree(ObjectId id);
+    default RevTree getTree(ObjectId id) {
+        return get(id, RevTree.class);
+    }
 
     /**
      * Shortcut for {@link #get(ObjectId, Class) get(id, RevFeature.class)}
      */
-    public RevFeature getFeature(ObjectId id);
+    default RevFeature getFeature(ObjectId id) {
+        return get(id, RevFeature.class);
+    }
 
     /**
      * Shortcut for {@link #get(ObjectId, Class) get(id, RevFeatureType.class)}
      */
-    public RevFeatureType getFeatureType(ObjectId id);
+    default RevFeatureType getFeatureType(ObjectId id) {
+        return get(id, RevFeatureType.class);
+    }
 
     /**
      * Shortcut for {@link #get(ObjectId, Class) get(id, RevCommit.class)}
      */
-    public RevCommit getCommit(ObjectId id);
+    default RevCommit getCommit(ObjectId id) {
+        return get(id, RevCommit.class);
+    }
 
     /**
      * Shortcut for {@link #get(ObjectId, Class) get(id, RevTag.class)}
      */
-    public RevTag getTag(ObjectId id);
+    default RevTag getTag(ObjectId id) {
+        return get(id, RevTag.class);
+    }
 
     /**
      * Adds an object to the database with the given {@link ObjectId id}. If an object with the same
@@ -131,22 +145,24 @@ public interface ObjectStore extends Store {
     public void delete(ObjectId objectId);
 
     /**
-     * Shorthand for {@link #getAll(Iterable, BulkOpListener)} with
+     * Shorthand for {@link #getAll(Stream, BulkOpListener)} with
      * {@link BulkOpListener#NOOP_LISTENER} as second argument
      */
-    public Iterator<RevObject> getAll(Iterable<ObjectId> ids);
+    default Stream<RevObject> getAll(Stream<ObjectId> ids) {
+        return getAll(ids, NOOP_LISTENER, RevObject.class);
+    }
 
     /**
      * Query method to retrieve a collection of objects from the database, given a collection of
      * object identifiers.
      * <p>
-     * The returned iterator may not preserve the order of the argument list of ids.
+     * The returned stream may not preserve the order of the argument list of ids.
      * <p>
      * The {@link BulkOpListener#found(RevObject, Integer) listener.found} method is going to be
-     * called for each object found as the returned iterator is traversed.
+     * called for each object found as the returned stream is traversed.
      * <p>
      * The {@link BulkOpListener#notFound(ObjectId) listener.notFound} method is to be called for
-     * each object not found as the iterator is traversed.
+     * each object not found as the stream is traversed.
      * <p>
      * Note, however, it's recommended the client code provides unique object ids in the {@code ids}
      * argument, as if it were a {@code java.util.Set}. The behavior on what the {@link ObjectStore}
@@ -158,21 +174,31 @@ public interface ObjectStore extends Store {
      * @param ids an iterable holding the list of ids to fetch from the database
      * @param listener a listener that gets notified of {@link BulkOpListener#deleted(ObjectId)
      *        deleted} and {@link BulkOpListener#notFound(ObjectId) not found} items
-     * @return an iterator with the objects <b>found</b> on the database, in no particular order
+     * @return a stream with the objects <b>found</b> on the database, in no particular order
      */
-    public Iterator<RevObject> getAll(Iterable<ObjectId> ids, BulkOpListener listener);
+    default Stream<RevObject> getAll(Stream<ObjectId> ids, BulkOpListener listener) {
+        return getAll(ids, listener, RevObject.class);
+    }
+
+    /**
+     * @since 2.0
+     * @see #getAll(Stream, BulkOpListener, Class)
+     */
+    default <T extends RevObject> Stream<T> getAll(Stream<ObjectId> ids, Class<T> type) {
+        return getAll(ids, NOOP_LISTENER, type);
+    }
 
     /**
      * Query method to retrieve a collection of objects of a given type from the database, given a
      * collection of object identifiers.
      * <p>
-     * The returned iterator may not preserve the order of the argument list of ids.
+     * The returned stream may not preserve the order of the argument list of ids.
      * <p>
      * The {@link BulkOpListener#found(RevObject, Integer) listener.found} method is going to be
-     * called for each object found as the returned iterator is traversed.
+     * called for each object found as the returned stream is traversed.
      * <p>
      * The {@link BulkOpListener#notFound(ObjectId) listener.notFound} method is to be called for
-     * each object not found as the iterator is traversed.
+     * each object not found as the stream is traversed.
      * <p>
      * If the object for one of the query ids exists but is not of the requested type, it's ignored
      * and reported as {@link BulkOpListener#notFound(ObjectId) not found} to the listener.
@@ -187,16 +213,18 @@ public interface ObjectStore extends Store {
      * @param ids an iterable holding the list of ids to fetch from the database
      * @param listener a listener that gets notified of {@link BulkOpListener#deleted(ObjectId)
      *        deleted} and {@link BulkOpListener#notFound(ObjectId) not found} items
-     * @return an iterator with the objects <b>found</b> on the database, in no particular order
+     * @return a stream with the objects <b>found</b> on the database, in no particular order
      */
-    public <T extends RevObject> Iterator<T> getAll(Iterable<ObjectId> ids, BulkOpListener listener,
+    public <T extends RevObject> Stream<T> getAll(Stream<ObjectId> ids, BulkOpListener listener,
             Class<T> type);
 
     /**
-     * Shorthand for {@link #putAll(Iterator, BulkOpListener)} with
+     * Shorthand for {@link #putAll(Stream, BulkOpListener)} with
      * {@link BulkOpListener#NOOP_LISTENER} as second argument
      */
-    public void putAll(Iterator<? extends RevObject> objects);
+    default void putAll(Stream<? extends RevObject> objects) {
+        putAll(objects, NOOP_LISTENER);
+    }
 
     /**
      * Inserts all objects into the object database
@@ -215,13 +243,15 @@ public interface ObjectStore extends Store {
      * @param objects the objects to request for insertion into the object database
      * @param listener a listener to get notifications of actually inserted objects
      */
-    public void putAll(Iterator<? extends RevObject> objects, BulkOpListener listener);
+    public void putAll(Stream<? extends RevObject> objects, BulkOpListener listener);
 
     /**
      * Shorthand for {@link #deleteAll(Stream, BulkOpListener)} with
      * {@link BulkOpListener#NOOP_LISTENER} as second argument
      */
-    public void deleteAll(Stream<ObjectId> ids);
+    default void deleteAll(Stream<ObjectId> ids) {
+        deleteAll(ids, NOOP_LISTENER);
+    }
 
     /**
      * Requests to delete all objects in the argument list of object ids from the object database.

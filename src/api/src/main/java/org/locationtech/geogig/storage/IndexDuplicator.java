@@ -13,14 +13,13 @@ import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.RecursiveAction;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.locationtech.geogig.model.Bucket;
 import org.locationtech.geogig.model.ObjectId;
@@ -157,21 +156,17 @@ public @Slf4j class IndexDuplicator {
             List<ForkJoinTask<?>> subTasks = new ArrayList<>();
 
             if (tree.bucketsSize() > 0) {
-                Iterable<ObjectId> bucketIds;
-                Iterator<RevTree> buckets;
-                bucketIds = Streams.stream(tree.getBuckets()).map(Bucket::getObjectId)
-                        .collect(Collectors.toList());
-                buckets = src.getAll(bucketIds, BulkOpListener.NOOP_LISTENER, RevTree.class);
-                while (buckets.hasNext()) {
-                    RevTree bucket = buckets.next();
-                    if (bucket.bucketsSize() == 0) {
-                        save.add(bucket);
-                    } else {
-                        if (!target.exists(bucket.getId())) {
+                Stream<ObjectId> bucketIds = Streams.stream(tree.getBuckets())
+                        .map(Bucket::getObjectId);
+                try (Stream<RevTree> buckets = src.getAll(bucketIds, RevTree.class)) {
+                    buckets.forEach(bucket -> {
+                        if (bucket.bucketsSize() == 0) {
+                            save.add(bucket);
+                        } else if (!target.exists(bucket.getId())) {
                             TreeCopyTask task = new TreeCopyTask(bucket, src, target);
                             subTasks.add(task);
                         }
-                    }
+                    });
                 }
             }
             subTasks.add(new SaveTask(save, target));
@@ -192,7 +187,7 @@ public @Slf4j class IndexDuplicator {
         }
 
         protected @Override void compute() {
-            target.putAll(save.iterator());
+            target.putAll(save.stream());
         }
     }
 }

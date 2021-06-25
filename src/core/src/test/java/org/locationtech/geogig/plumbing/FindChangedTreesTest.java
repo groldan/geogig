@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -52,7 +53,6 @@ import org.locationtech.geogig.test.TestRepository;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
@@ -338,8 +338,9 @@ public class FindChangedTreesTest {
         List<NodeRef> layers = new ArrayList<>();
         WorkingTree workingTree = repo.context().workingTree();
 
-        repo.context().objectDatabase().putAll(Iterators.transform(types.values().iterator(),
-                (t) -> RevFeatureType.builder().type(t).build()));
+        Stream<RevFeatureType> revtypes = types.values().stream()
+                .map(t -> RevFeatureType.builder().type(t).build());
+        repo.context().objectDatabase().putAll(revtypes);
 
         RevTree wt = workingTree.getTree();
         RevTreeBuilder newWorkHeadBuilder = RevTreeBuilder.builder(repo.context().objectDatabase(),

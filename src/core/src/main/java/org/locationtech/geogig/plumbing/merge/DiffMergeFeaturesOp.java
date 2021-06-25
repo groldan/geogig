@@ -181,7 +181,7 @@ public class DiffMergeFeaturesOp extends AbstractGeoGigOp<DiffMergeFeatureResult
         Set<ObjectId> ids = Sets.newHashSet(ancestorMetadataId, mergetIntoMetadataId,
                 toMergeMetadataId, ancestorFeatureId, featureAId, featureBId);
 
-        Iterator<RevObject> objsit = objectDatabase().getAll(ids, BulkOpListener.NOOP_LISTENER);
+        Iterator<RevObject> objsit = objectDatabase().getAll(ids);
         ImmutableMap<ObjectId, RevObject> map = Maps.uniqueIndex(objsit, RevObject::getId);
 
         if (ids.size() != map.size()) {

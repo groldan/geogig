@@ -121,28 +121,28 @@ public class ForwardingObjectStore implements ObjectStore {
         actual.delete(objectId);
     }
 
-    public @Override Iterator<RevObject> getAll(Iterable<ObjectId> ids) {
+    public @Override Stream<RevObject> getAll(Stream<ObjectId> ids) {
         checkOpen();
         return actual.getAll(ids);
     }
 
-    public @Override Iterator<RevObject> getAll(Iterable<ObjectId> ids, BulkOpListener listener) {
+    public @Override Stream<RevObject> getAll(Stream<ObjectId> ids, BulkOpListener listener) {
         checkOpen();
         return actual.getAll(ids, listener);
     }
 
-    public @Override <T extends RevObject> Iterator<T> getAll(Iterable<ObjectId> ids,
+    public @Override <T extends RevObject> Stream<T> getAll(Stream<ObjectId> ids,
             BulkOpListener listener, Class<T> type) {
         checkOpen();
         return actual.getAll(ids, listener, type);
     }
 
-    public @Override void putAll(Iterator<? extends RevObject> objects) {
+    public @Override void putAll(Stream<? extends RevObject> objects) {
         checkWritable();
         actual.putAll(objects);
     }
 
-    public @Override void putAll(Iterator<? extends RevObject> objects, BulkOpListener listener) {
+    public @Override void putAll(Stream<? extends RevObject> objects, BulkOpListener listener) {
         checkWritable();
         actual.putAll(objects, listener);
     }

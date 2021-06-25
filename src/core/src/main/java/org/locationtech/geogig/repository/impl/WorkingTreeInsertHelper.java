@@ -214,7 +214,7 @@ class WorkingTreeInsertHelper {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        db.putAll(builtTrees.values().iterator());
+        db.putAll(builtTrees.values().stream());
         return builtTrees;
     }
 

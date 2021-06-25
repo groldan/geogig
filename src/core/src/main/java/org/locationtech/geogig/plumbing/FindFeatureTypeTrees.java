@@ -83,8 +83,7 @@ public class FindFeatureTypeTrees extends AbstractGeoGigOp<List<NodeRef>> {
         if (tree.bucketsSize() > 0) {
             Iterable<ObjectId> bucketIds = () -> Streams.stream(tree.getBuckets())
                     .map(Bucket::getObjectId).iterator();
-            Iterator<RevTree> bucketTrees = source.getAll(bucketIds, BulkOpListener.NOOP_LISTENER,
-                    RevTree.class);
+            Iterator<RevTree> bucketTrees = source.getAll(bucketIds, RevTree.class);
             bucketTrees
                     .forEachRemaining(bucket -> subtrees.addAll(getSubTrees(bucket, parentPath)));
         }

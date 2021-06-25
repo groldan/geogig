@@ -9,8 +9,6 @@
  */
 package org.locationtech.geogig.storage.internal;
 
-import static org.locationtech.geogig.storage.BulkOpListener.NOOP_LISTENER;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -18,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.Nullable;
 import org.locationtech.geogig.model.DiffEntry;
@@ -124,13 +123,17 @@ public class ObjectStoreDiffObjectIterator<T extends RevObject>
             }
         });
 
-        Iterator<T> objects = leftStore.getAll(leftEntriesIds, NOOP_LISTENER, this.type);
+        Stream<T> objects = leftStore.getAll(leftEntriesIds.stream(), this.type);
         if (rightEntriesIds != leftEntriesIds && !rightEntriesIds.isEmpty()) {
-            objects = Iterators.concat(objects,
-                    rightStore.getAll(rightEntriesIds, NOOP_LISTENER, this.type));
+            objects = Stream.concat(objects,
+                    rightStore.getAll(rightEntriesIds.stream(), this.type));
         }
         Map<ObjectId, T> objectsById = new HashMap<>();
-        objects.forEachRemaining(o -> objectsById.putIfAbsent(o.getId(), o));
+        try {
+            objects.forEach(o -> objectsById.putIfAbsent(o.getId(), o));
+        } finally {
+            objects.close();
+        }
         nextBatch = createBatch(nextEntries, objectsById);
         return computeNext();
     }

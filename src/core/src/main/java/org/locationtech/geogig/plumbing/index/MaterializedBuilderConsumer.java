@@ -116,8 +116,7 @@ class MaterializedBuilderConsumer extends AbstractConsumer {
             Iterable<Node> allNodes = Iterables.concat(list);
 
             Iterable<ObjectId> nodeIds = Iterables.transform(allNodes, Node::getObjectId);
-            Iterator<RevFeature> objectsIt = featureSource.getAll(nodeIds,
-                    BulkOpListener.NOOP_LISTENER, RevFeature.class);
+            Iterator<RevFeature> objectsIt = featureSource.getAll(nodeIds, RevFeature.class);
             objectsIt.forEachRemaining((o) -> objects.put(o.getId(), o));
         }
 

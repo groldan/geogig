@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import org.locationtech.geogig.feature.Feature;
 import org.locationtech.geogig.feature.FeatureType;
@@ -55,7 +56,6 @@ import org.locationtech.geogig.repository.FeatureInfo;
 import org.locationtech.geogig.repository.Repository;
 import org.locationtech.geogig.repository.WorkingTree;
 import org.locationtech.geogig.storage.AutoCloseableIterator;
-import org.locationtech.geogig.storage.BulkOpListener;
 import org.locationtech.geogig.storage.ObjectInfo;
 import org.locationtech.geogig.transaction.GeogigTransaction;
 import org.locationtech.geogig.transaction.TransactionBegin;
@@ -65,7 +65,6 @@ import org.locationtech.jts.io.WKTReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -405,8 +404,7 @@ public class TestData {
         Map<String, Feature> featuresByPath = new HashMap<>();
 
         try (AutoCloseableIterator<ObjectInfo<RevFeature>> features = context.objectDatabase()
-                .getObjects(nodes.values().iterator(), BulkOpListener.NOOP_LISTENER,
-                        RevFeature.class)) {
+                .getObjects(nodes.values().iterator(), RevFeature.class)) {
 
             features.forEachRemaining(rf -> {
                 String typeName = rf.ref().getParentPath();
@@ -424,11 +422,11 @@ public class TestData {
         List<NodeRef> treeNodes = context.command(FindFeatureTypeTrees.class)
                 .setRootTreeRef(rootTreeIsh).call();
 
-        Iterator<RevFeatureType> types = context.objectDatabase().getAll(
-                Iterables.transform(treeNodes, n -> n.getMetadataId()),
-                BulkOpListener.NOOP_LISTENER, RevFeatureType.class);
+        try (Stream<RevFeatureType> types = context.objectDatabase()
+                .getAll(treeNodes.stream().map(NodeRef::getMetadataId), RevFeatureType.class)) {
 
-        return Maps.uniqueIndex(types, t -> t.getName().getLocalPart());
+            return Maps.uniqueIndex(types.iterator(), t -> t.getName().getLocalPart());
+        }
     }
 
     public TestData remove(String... featureIds) {

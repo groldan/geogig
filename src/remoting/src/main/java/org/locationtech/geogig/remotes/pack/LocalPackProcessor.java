@@ -9,8 +9,6 @@
  */
 package org.locationtech.geogig.remotes.pack;
 
-import static org.locationtech.geogig.storage.BulkOpListener.NOOP_LISTENER;
-
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -77,8 +75,7 @@ public class LocalPackProcessor implements PackProcessor {
             producerThread.submit(producer);
             Iterator<ObjectId> missingContentIds = producer.iterator();
 
-            missingContents = sourceStore.getAll(() -> missingContentIds, NOOP_LISTENER,
-                    RevTree.class);
+            missingContents = sourceStore.getAll(() -> missingContentIds, RevTree.class);
             IndexInfo indexInfo = indexDef.getIndex();
             CountingListener c = new BulkOpListener.CountingListener();
             indexdb.putAll(missingContents, c);

@@ -10,37 +10,31 @@
 package org.locationtech.geogig.porcelain;
 
 import static com.google.common.collect.Lists.newArrayList;
-import static com.google.common.collect.Lists.transform;
 
-import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.locationtech.geogig.model.ObjectId;
 import org.locationtech.geogig.model.Ref;
 import org.locationtech.geogig.model.RevTag;
 import org.locationtech.geogig.plumbing.ForEachRef;
 import org.locationtech.geogig.repository.impl.AbstractGeoGigOp;
-import org.locationtech.geogig.storage.BulkOpListener;
-
-import com.google.common.collect.ImmutableList;
 
 /**
  * Returns a list of all tags
  * 
  */
-public class TagListOp extends AbstractGeoGigOp<ImmutableList<RevTag>> {
+public class TagListOp extends AbstractGeoGigOp<List<RevTag>> {
 
-    protected @Override ImmutableList<RevTag> _call() {
+    protected @Override List<RevTag> _call() {
         List<Ref> refs = newArrayList(
                 command(ForEachRef.class).setPrefixFilter(Ref.TAGS_PREFIX).call());
-        List<ObjectId> tagIds = transform(refs, Ref::getObjectId);
 
-        Iterator<RevTag> alltags;
-        alltags = objectDatabase().getAll(tagIds, BulkOpListener.NOOP_LISTENER, RevTag.class);
+        Stream<ObjectId> tagIds = refs.stream().map(Ref::getObjectId);
 
-        ImmutableList<RevTag> res = ImmutableList.copyOf(alltags);
-
-        return res;
+        try (Stream<RevTag> tags = objectDatabase().getAll(tagIds, RevTag.class)) {
+            return tags.collect(Collectors.toList());
+        }
     }
-
 }

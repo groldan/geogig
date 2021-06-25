@@ -64,6 +64,7 @@ import com.google.common.base.Predicates;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import lombok.NonNull;
@@ -378,7 +379,7 @@ public class WorkingTreeImpl implements WorkingTree {
         features = Iterators.filter(features, fn);
 
         Stopwatch insertTime = Stopwatch.createStarted();
-        indexDatabase.putAll(features);
+        indexDatabase.putAll(Streams.stream(features));
         insertTime.stop();
         if (progress.isCanceled()) {
             return currentWorkHead.getId();
